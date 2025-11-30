@@ -327,15 +327,762 @@ MonoBehaviour:
   dictationManager: {fileID: 207147541}
   rightRayInteractor: {fileID: 773190234}
   leftRayInteractor: {fileID: 1964602102}
+  usePythonServer: 0
+  pythonClient: {fileID: 0}
   defaultCubePrefab: {fileID: 3151608994183704326, guid: 0b43034b68fba0f41a5c953dc2788f06,
     type: 3}
   objectMappings:
-  - objectName: Chair
-    prefab: {fileID: 5417771265258665685, guid: 922fd260024b1164cb46c2ba91dbf2fd,
-      type: 3}
+  - objectName: Basket #1
+    prefab: {fileID: 0}
+    glbPath: basket/133d74f10a0401317773da01b1ba21ef.glb
+    keywords:
+    - basket
+  - objectName: Basket #2
+    prefab: {fileID: 0}
+    glbPath: basket/1ed60448a8cc4b916e6624d94e2e0a1d.glb
+    keywords:
+    - basket
+  - objectName: Basket #3
+    prefab: {fileID: 0}
+    glbPath: basket/1f6046149060eb81cbde89e0c48a01bf.glb
+    keywords:
+    - basket
+  - objectName: Basket #4
+    prefab: {fileID: 0}
+    glbPath: basket/2056cbd13e92764a61b3b6f2928a81b2.glb
+    keywords:
+    - basket
+  - objectName: Basket #5
+    prefab: {fileID: 0}
+    glbPath: basket/2294583b27469851da06470a491566ee.glb
+    keywords:
+    - basket
+  - objectName: Bed #1
+    prefab: {fileID: 0}
+    glbPath: bed/10c15151ebe3d237240ea0cdca7b391a.glb
+    keywords:
+    - bed
+  - objectName: Bed #2
+    prefab: {fileID: 0}
+    glbPath: bed/1101146651cd32a1bd09c0f277d16187.glb
+    keywords:
+    - bed
+  - objectName: Bed #3
+    prefab: {fileID: 0}
+    glbPath: bed/1347959af4df977a15dd7d7985e749c1.glb
+    keywords:
+    - bed
+  - objectName: Bed #4
+    prefab: {fileID: 0}
+    glbPath: bed/1619aa637cbb6e131ba2f806cba87b47.glb
+    keywords:
+    - bed
+  - objectName: Bed #5
+    prefab: {fileID: 0}
+    glbPath: bed/162af9629f9071cd38f8f3d7f64ab05f.glb
+    keywords:
+    - bed
+  - objectName: Bench #1
+    prefab: {fileID: 0}
+    glbPath: bench/1042d723dfc31ce5ec56aed2da084563.glb
+    keywords:
+    - bench
+  - objectName: Bench #2
+    prefab: {fileID: 0}
+    glbPath: bench/106494f75125eea6adf66a6d73888234.glb
+    keywords:
+    - bench
+  - objectName: Bench #3
+    prefab: {fileID: 0}
+    glbPath: bench/10654ea604644c8eca7ed590d69b9804.glb
+    keywords:
+    - bench
+  - objectName: Bench #4
+    prefab: {fileID: 0}
+    glbPath: bench/107c0b6b32282102493c8fb81dc7c4da.glb
+    keywords:
+    - bench
+  - objectName: Bench #5
+    prefab: {fileID: 0}
+    glbPath: bench/107eb4f1731b2466780bc2708a85ba9a.glb
+    keywords:
+    - bench
+  - objectName: Bookshelf #1
+    prefab: {fileID: 0}
+    glbPath: bookshelf/104874322c6f7a75aba93753eed86c0a.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #2
+    prefab: {fileID: 0}
+    glbPath: bookshelf/1170df5b9512c1d92f6bce2b7e6c12b7.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #3
+    prefab: {fileID: 0}
+    glbPath: bookshelf/12766f3b398d1cbd071cf06b697010e.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #4
+    prefab: {fileID: 0}
+    glbPath: bookshelf/128a322c75bb43195050d6a2f5d42f74.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #5
+    prefab: {fileID: 0}
+    glbPath: bookshelf/131b5b691ff5bff3945770bff82992ca.glb
+    keywords:
+    - bookshelf
+  - objectName: Cabinet #1
+    prefab: {fileID: 0}
+    glbPath: cabinet/1055dc4f3f2079f7e6c5cd45aa112726.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #2
+    prefab: {fileID: 0}
+    glbPath: cabinet/1074bdcb3c2032fe0f3f8b6e1796773.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #3
+    prefab: {fileID: 0}
+    glbPath: cabinet/10798ccb7072393e86d53ab0fe94e911.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #4
+    prefab: {fileID: 0}
+    glbPath: cabinet/108295ef2f00c9aa9d886ab2fa5ee681.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #5
+    prefab: {fileID: 0}
+    glbPath: cabinet/10b54fe832a00c3ec59350d819542ec7.glb
+    keywords:
+    - cabinet
+  - objectName: Chair #1
+    prefab: {fileID: 0}
+    glbPath: chair/1006be65e7bc937e9141f9b58470d646.glb
     keywords:
     - chair
-    - seat
+  - objectName: Chair #2
+    prefab: {fileID: 0}
+    glbPath: chair/1007e20d5e811b308351982a6e40cf41.glb
+    keywords:
+    - chair
+  - objectName: Chair #3
+    prefab: {fileID: 0}
+    glbPath: chair/100b18376b885f206ae9ad7e32c4139d.glb
+    keywords:
+    - chair
+  - objectName: Chair #4
+    prefab: {fileID: 0}
+    glbPath: chair/1013f70851210a618f2e765c4a8ed3d.glb
+    keywords:
+    - chair
+  - objectName: Chair #5
+    prefab: {fileID: 0}
+    glbPath: chair/1015e71a0d21b127de03ab2a27ba7531.glb
+    keywords:
+    - chair
+  - objectName: Clock #1
+    prefab: {fileID: 0}
+    glbPath: clock/10312d9d07db5d9a4159aeb47682f2cb.glb
+    keywords:
+    - clock
+  - objectName: Clock #2
+    prefab: {fileID: 0}
+    glbPath: clock/108b7ee0ca90a60cdb98a62365dd8bc1.glb
+    keywords:
+    - clock
+  - objectName: Clock #3
+    prefab: {fileID: 0}
+    glbPath: clock/10a200395145c61aea2f5d52559debc.glb
+    keywords:
+    - clock
+  - objectName: Clock #4
+    prefab: {fileID: 0}
+    glbPath: clock/10ce229d913c23d56b08f078360ade39.glb
+    keywords:
+    - clock
+  - objectName: Clock #5
+    prefab: {fileID: 0}
+    glbPath: clock/11a3be19e931e77caadb7997f5aa04c9.glb
+    keywords:
+    - clock
+  - objectName: Lamp #1
+    prefab: {fileID: 0}
+    glbPath: lamp/101d0e7dbd07d8247dfd6bf7196ba84d.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #2
+    prefab: {fileID: 0}
+    glbPath: lamp/102273fdf8d1b90041fbc1e2da054acb.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #3
+    prefab: {fileID: 0}
+    glbPath: lamp/107b8c870eade2481735ea0e092a805a.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #4
+    prefab: {fileID: 0}
+    glbPath: lamp/108a5262552050dfa9370719b830fc2c.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #5
+    prefab: {fileID: 0}
+    glbPath: lamp/10ba42fc70f16d7f41d86c17c15247b0.glb
+    keywords:
+    - lamp
+  - objectName: Sofa #1
+    prefab: {fileID: 0}
+    glbPath: sofa/1037fd31d12178d396f164a988ef37cc.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #2
+    prefab: {fileID: 0}
+    glbPath: sofa/103b76b2594a1582eaf14273fa406ffc.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #3
+    prefab: {fileID: 0}
+    glbPath: sofa/104256e5bb73b0b719fb4103277a6b93.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #4
+    prefab: {fileID: 0}
+    glbPath: sofa/1050790962944624febad4f49b26ec52.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #5
+    prefab: {fileID: 0}
+    glbPath: sofa/1053897adff12c7839c40eb1ac71e4c1.glb
+    keywords:
+    - sofa
+  - objectName: Table #1
+    prefab: {fileID: 0}
+    glbPath: table/1011e1c9812b84d2a9ed7bb5b55809f8.glb
+    keywords:
+    - table
+  - objectName: Table #2
+    prefab: {fileID: 0}
+    glbPath: table/10139657dfa9afe0c3bd24f986301745.glb
+    keywords:
+    - table
+  - objectName: Table #3
+    prefab: {fileID: 0}
+    glbPath: table/1028a9cbaa7a333230bbd4cddd04c77b.glb
+    keywords:
+    - table
+  - objectName: Table #4
+    prefab: {fileID: 0}
+    glbPath: table/102f0532f9f8bbcdcb503f63ed915ed2.glb
+    keywords:
+    - table
+  - objectName: Table #5
+    prefab: {fileID: 0}
+    glbPath: table/1033f41fd2decfa938da3ea2c9e0e4f.glb
+    keywords:
+    - table
+  - objectName: Basket #1
+    prefab: {fileID: 0}
+    glbPath: basket/133d74f10a0401317773da01b1ba21ef.glb
+    keywords:
+    - basket
+  - objectName: Basket #2
+    prefab: {fileID: 0}
+    glbPath: basket/1ed60448a8cc4b916e6624d94e2e0a1d.glb
+    keywords:
+    - basket
+  - objectName: Basket #3
+    prefab: {fileID: 0}
+    glbPath: basket/1f6046149060eb81cbde89e0c48a01bf.glb
+    keywords:
+    - basket
+  - objectName: Basket #4
+    prefab: {fileID: 0}
+    glbPath: basket/2056cbd13e92764a61b3b6f2928a81b2.glb
+    keywords:
+    - basket
+  - objectName: Basket #5
+    prefab: {fileID: 0}
+    glbPath: basket/2294583b27469851da06470a491566ee.glb
+    keywords:
+    - basket
+  - objectName: Basket #6
+    prefab: {fileID: 0}
+    glbPath: basket/242e6c21d53890a236b0f2a1430e993a.glb
+    keywords:
+    - basket
+  - objectName: Basket #7
+    prefab: {fileID: 0}
+    glbPath: basket/27f58201df188ce0c76e1e2d1feb4ae.glb
+    keywords:
+    - basket
+  - objectName: Basket #8
+    prefab: {fileID: 0}
+    glbPath: basket/284c23b810fc7823466f97f37dccbde.glb
+    keywords:
+    - basket
+  - objectName: Basket #9
+    prefab: {fileID: 0}
+    glbPath: basket/29880fedb8770d6ce51e3cd2b72fbf02.glb
+    keywords:
+    - basket
+  - objectName: Basket #10
+    prefab: {fileID: 0}
+    glbPath: basket/2ae75c0f4bf43142e76bc197b3a3ffc0.glb
+    keywords:
+    - basket
+  - objectName: Bed #1
+    prefab: {fileID: 0}
+    glbPath: bed/10c15151ebe3d237240ea0cdca7b391a.glb
+    keywords:
+    - bed
+  - objectName: Bed #2
+    prefab: {fileID: 0}
+    glbPath: bed/1101146651cd32a1bd09c0f277d16187.glb
+    keywords:
+    - bed
+  - objectName: Bed #3
+    prefab: {fileID: 0}
+    glbPath: bed/1347959af4df977a15dd7d7985e749c1.glb
+    keywords:
+    - bed
+  - objectName: Bed #4
+    prefab: {fileID: 0}
+    glbPath: bed/1619aa637cbb6e131ba2f806cba87b47.glb
+    keywords:
+    - bed
+  - objectName: Bed #5
+    prefab: {fileID: 0}
+    glbPath: bed/162af9629f9071cd38f8f3d7f64ab05f.glb
+    keywords:
+    - bed
+  - objectName: Bed #6
+    prefab: {fileID: 0}
+    glbPath: bed/16b4dfae678239a42d470147ee1bb468.glb
+    keywords:
+    - bed
+  - objectName: Bed #7
+    prefab: {fileID: 0}
+    glbPath: bed/19d88337c81737d3bc19762eaa7ba40f.glb
+    keywords:
+    - bed
+  - objectName: Bed #8
+    prefab: {fileID: 0}
+    glbPath: bed/19de1e83fbe292f55a2aa419fded589d.glb
+    keywords:
+    - bed
+  - objectName: Bed #9
+    prefab: {fileID: 0}
+    glbPath: bed/19ecbf9af52ad3fdc3bd24f986301745.glb
+    keywords:
+    - bed
+  - objectName: Bed #10
+    prefab: {fileID: 0}
+    glbPath: bed/1aa55867200ea789465e08d496c0420f.glb
+    keywords:
+    - bed
+  - objectName: Bench #1
+    prefab: {fileID: 0}
+    glbPath: bench/1042d723dfc31ce5ec56aed2da084563.glb
+    keywords:
+    - bench
+  - objectName: Bench #2
+    prefab: {fileID: 0}
+    glbPath: bench/106494f75125eea6adf66a6d73888234.glb
+    keywords:
+    - bench
+  - objectName: Bench #3
+    prefab: {fileID: 0}
+    glbPath: bench/10654ea604644c8eca7ed590d69b9804.glb
+    keywords:
+    - bench
+  - objectName: Bench #4
+    prefab: {fileID: 0}
+    glbPath: bench/107c0b6b32282102493c8fb81dc7c4da.glb
+    keywords:
+    - bench
+  - objectName: Bench #5
+    prefab: {fileID: 0}
+    glbPath: bench/107eb4f1731b2466780bc2708a85ba9a.glb
+    keywords:
+    - bench
+  - objectName: Bench #6
+    prefab: {fileID: 0}
+    glbPath: bench/1093ca7b44ac90cd902e30b4d3d9167d.glb
+    keywords:
+    - bench
+  - objectName: Bench #7
+    prefab: {fileID: 0}
+    glbPath: bench/10a66ce0a6b469d3b2cb19fcedc32ddd.glb
+    keywords:
+    - bench
+  - objectName: Bench #8
+    prefab: {fileID: 0}
+    glbPath: bench/10b43623dbc8ab25ad5067eac75a07f7.glb
+    keywords:
+    - bench
+  - objectName: Bench #9
+    prefab: {fileID: 0}
+    glbPath: bench/10bb5f29a8654f22ad5067eac75a07f7.glb
+    keywords:
+    - bench
+  - objectName: Bench #10
+    prefab: {fileID: 0}
+    glbPath: bench/10cfa696ba2259ccbbba142d6df53ce.glb
+    keywords:
+    - bench
+  - objectName: Bookshelf #1
+    prefab: {fileID: 0}
+    glbPath: bookshelf/104874322c6f7a75aba93753eed86c0a.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #2
+    prefab: {fileID: 0}
+    glbPath: bookshelf/1170df5b9512c1d92f6bce2b7e6c12b7.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #3
+    prefab: {fileID: 0}
+    glbPath: bookshelf/12766f3b398d1cbd071cf06b697010e.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #4
+    prefab: {fileID: 0}
+    glbPath: bookshelf/128a322c75bb43195050d6a2f5d42f74.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #5
+    prefab: {fileID: 0}
+    glbPath: bookshelf/131b5b691ff5bff3945770bff82992ca.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #6
+    prefab: {fileID: 0}
+    glbPath: bookshelf/13d1ffe8682729b29af4053b8815b239.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #7
+    prefab: {fileID: 0}
+    glbPath: bookshelf/14e2cc3454ffcc65cd1d915262958e02.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #8
+    prefab: {fileID: 0}
+    glbPath: bookshelf/14f0caee76872a89571be7eae57ba8b5.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #9
+    prefab: {fileID: 0}
+    glbPath: bookshelf/1761cc50604f9faef759bc1c69ff20e0.glb
+    keywords:
+    - bookshelf
+  - objectName: Bookshelf #10
+    prefab: {fileID: 0}
+    glbPath: bookshelf/184eb80b82bdd4e1159f1e6a557f2ea8.glb
+    keywords:
+    - bookshelf
+  - objectName: Cabinet #1
+    prefab: {fileID: 0}
+    glbPath: cabinet/1055dc4f3f2079f7e6c5cd45aa112726.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #2
+    prefab: {fileID: 0}
+    glbPath: cabinet/1074bdcb3c2032fe0f3f8b6e1796773.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #3
+    prefab: {fileID: 0}
+    glbPath: cabinet/10798ccb7072393e86d53ab0fe94e911.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #4
+    prefab: {fileID: 0}
+    glbPath: cabinet/108295ef2f00c9aa9d886ab2fa5ee681.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #5
+    prefab: {fileID: 0}
+    glbPath: cabinet/10b54fe832a00c3ec59350d819542ec7.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #6
+    prefab: {fileID: 0}
+    glbPath: cabinet/10c14b0cb76f87584da5feafe6f1c8fc.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #7
+    prefab: {fileID: 0}
+    glbPath: cabinet/10c484963692d3c87d40405e5ee68b4f.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #8
+    prefab: {fileID: 0}
+    glbPath: cabinet/11224ef64e1702b412e0c474ff07001f.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #9
+    prefab: {fileID: 0}
+    glbPath: cabinet/114b810af4a847ca99dd23ec22c4943b.glb
+    keywords:
+    - cabinet
+  - objectName: Cabinet #10
+    prefab: {fileID: 0}
+    glbPath: cabinet/115e4c9a9150fe8e99dd23ec22c4943b.glb
+    keywords:
+    - cabinet
+  - objectName: Chair #1
+    prefab: {fileID: 0}
+    glbPath: chair/1006be65e7bc937e9141f9b58470d646.glb
+    keywords:
+    - chair
+  - objectName: Chair #2
+    prefab: {fileID: 0}
+    glbPath: chair/1007e20d5e811b308351982a6e40cf41.glb
+    keywords:
+    - chair
+  - objectName: Chair #3
+    prefab: {fileID: 0}
+    glbPath: chair/100b18376b885f206ae9ad7e32c4139d.glb
+    keywords:
+    - chair
+  - objectName: Chair #4
+    prefab: {fileID: 0}
+    glbPath: chair/1013f70851210a618f2e765c4a8ed3d.glb
+    keywords:
+    - chair
+  - objectName: Chair #5
+    prefab: {fileID: 0}
+    glbPath: chair/1015e71a0d21b127de03ab2a27ba7531.glb
+    keywords:
+    - chair
+  - objectName: Chair #6
+    prefab: {fileID: 0}
+    glbPath: chair/1016f4debe988507589aae130c1f06fb.glb
+    keywords:
+    - chair
+  - objectName: Chair #7
+    prefab: {fileID: 0}
+    glbPath: chair/1022fe7dd03f6a4d4d5ad9f13ac9f4e7.glb
+    keywords:
+    - chair
+  - objectName: Chair #8
+    prefab: {fileID: 0}
+    glbPath: chair/1028b32dc1873c2afe26a3ac360dbd4.glb
+    keywords:
+    - chair
+  - objectName: Chair #9
+    prefab: {fileID: 0}
+    glbPath: chair/1031fc859dc3177a2f84cb7932f866fd.glb
+    keywords:
+    - chair
+  - objectName: Chair #10
+    prefab: {fileID: 0}
+    glbPath: chair/1033ee86cc8bac4390962e4fb7072b86.glb
+    keywords:
+    - chair
+  - objectName: Clock #1
+    prefab: {fileID: 0}
+    glbPath: clock/10312d9d07db5d9a4159aeb47682f2cb.glb
+    keywords:
+    - clock
+  - objectName: Clock #2
+    prefab: {fileID: 0}
+    glbPath: clock/108b7ee0ca90a60cdb98a62365dd8bc1.glb
+    keywords:
+    - clock
+  - objectName: Clock #3
+    prefab: {fileID: 0}
+    glbPath: clock/10a200395145c61aea2f5d52559debc.glb
+    keywords:
+    - clock
+  - objectName: Clock #4
+    prefab: {fileID: 0}
+    glbPath: clock/10ce229d913c23d56b08f078360ade39.glb
+    keywords:
+    - clock
+  - objectName: Clock #5
+    prefab: {fileID: 0}
+    glbPath: clock/11a3be19e931e77caadb7997f5aa04c9.glb
+    keywords:
+    - clock
+  - objectName: Clock #6
+    prefab: {fileID: 0}
+    glbPath: clock/11c8463ba58a134b68661782af60b711.glb
+    keywords:
+    - clock
+  - objectName: Clock #7
+    prefab: {fileID: 0}
+    glbPath: clock/1251971bcfcfad61624cf22ecb5162b7.glb
+    keywords:
+    - clock
+  - objectName: Clock #8
+    prefab: {fileID: 0}
+    glbPath: clock/143e665cb61b96751311158f08f2982a.glb
+    keywords:
+    - clock
+  - objectName: Clock #9
+    prefab: {fileID: 0}
+    glbPath: clock/14556ed62cba8483365bd0790b72f2a1.glb
+    keywords:
+    - clock
+  - objectName: Clock #10
+    prefab: {fileID: 0}
+    glbPath: clock/147df4e2a9af41fbf51f77a6d7299806.glb
+    keywords:
+    - clock
+  - objectName: Lamp #1
+    prefab: {fileID: 0}
+    glbPath: lamp/101d0e7dbd07d8247dfd6bf7196ba84d.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #2
+    prefab: {fileID: 0}
+    glbPath: lamp/102273fdf8d1b90041fbc1e2da054acb.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #3
+    prefab: {fileID: 0}
+    glbPath: lamp/107b8c870eade2481735ea0e092a805a.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #4
+    prefab: {fileID: 0}
+    glbPath: lamp/108a5262552050dfa9370719b830fc2c.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #5
+    prefab: {fileID: 0}
+    glbPath: lamp/10ba42fc70f16d7f41d86c17c15247b0.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #6
+    prefab: {fileID: 0}
+    glbPath: lamp/110b426397c707bdc9c869210ebfd6b0.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #7
+    prefab: {fileID: 0}
+    glbPath: lamp/1112f253e122dc8273111597f45b8227.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #8
+    prefab: {fileID: 0}
+    glbPath: lamp/11194326770b1225d49b2e04785f8492.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #9
+    prefab: {fileID: 0}
+    glbPath: lamp/112058b3f8c94177d2dba55bc7acf0bc.glb
+    keywords:
+    - lamp
+  - objectName: Lamp #10
+    prefab: {fileID: 0}
+    glbPath: lamp/1129a07c75f5a709cf004563556ddb36.glb
+    keywords:
+    - lamp
+  - objectName: Sofa #1
+    prefab: {fileID: 0}
+    glbPath: sofa/1037fd31d12178d396f164a988ef37cc.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #2
+    prefab: {fileID: 0}
+    glbPath: sofa/103b76b2594a1582eaf14273fa406ffc.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #3
+    prefab: {fileID: 0}
+    glbPath: sofa/104256e5bb73b0b719fb4103277a6b93.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #4
+    prefab: {fileID: 0}
+    glbPath: sofa/1050790962944624febad4f49b26ec52.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #5
+    prefab: {fileID: 0}
+    glbPath: sofa/1053897adff12c7839c40eb1ac71e4c1.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #6
+    prefab: {fileID: 0}
+    glbPath: sofa/10552f968486cd0ad138a53ab0d038a5.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #7
+    prefab: {fileID: 0}
+    glbPath: sofa/105849baff12c6fc2bf2dcc31ba1713.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #8
+    prefab: {fileID: 0}
+    glbPath: sofa/1059a78893d810bb14038d588fd1342f.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #9
+    prefab: {fileID: 0}
+    glbPath: sofa/107637b6bdf8129d4904d89e9169817b.glb
+    keywords:
+    - sofa
+  - objectName: Sofa #10
+    prefab: {fileID: 0}
+    glbPath: sofa/107bce22d72f322eedf1bb0b62653056.glb
+    keywords:
+    - sofa
+  - objectName: Table #1
+    prefab: {fileID: 0}
+    glbPath: table/1011e1c9812b84d2a9ed7bb5b55809f8.glb
+    keywords:
+    - table
+  - objectName: Table #2
+    prefab: {fileID: 0}
+    glbPath: table/10139657dfa9afe0c3bd24f986301745.glb
+    keywords:
+    - table
+  - objectName: Table #3
+    prefab: {fileID: 0}
+    glbPath: table/1028a9cbaa7a333230bbd4cddd04c77b.glb
+    keywords:
+    - table
+  - objectName: Table #4
+    prefab: {fileID: 0}
+    glbPath: table/102f0532f9f8bbcdcb503f63ed915ed2.glb
+    keywords:
+    - table
+  - objectName: Table #5
+    prefab: {fileID: 0}
+    glbPath: table/1033f41fd2decfa938da3ea2c9e0e4f.glb
+    keywords:
+    - table
+  - objectName: Table #6
+    prefab: {fileID: 0}
+    glbPath: table/103ad97126bc54f4fc5e9e325e1bd5b8.glb
+    keywords:
+    - table
+  - objectName: Table #7
+    prefab: {fileID: 0}
+    glbPath: table/1040cd764facf6981190e285a2cbc9c.glb
+    keywords:
+    - table
+  - objectName: Table #8
+    prefab: {fileID: 0}
+    glbPath: table/104c5225ef0a288ff932326d9778e21b.glb
+    keywords:
+    - table
+  - objectName: Table #9
+    prefab: {fileID: 0}
+    glbPath: table/104c8e90ecf0e5351ed672982b7954af.glb
+    keywords:
+    - table
+  - objectName: Table #10
+    prefab: {fileID: 0}
+    glbPath: table/104ebf7f96c77fb46a0faccc2a4015d8.glb
+    keywords:
+    - table
+  runtimeModelLoader: {fileID: 1124732204}
 --- !u!4 &476427105
 Transform:
   m_ObjectHideFlags: 0
@@ -346,6 +1093,159 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.017177919, y: 0.9498923, z: 1.367456}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &487324546
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 487324548}
+  - component: {fileID: 487324547}
+  m_Layer: 0
+  m_Name: VoiceColorChanger
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &487324547
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 487324546}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f31d793930777ea40972e2a885f4bd5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dictationManager: {fileID: 207147541}
+  rightRayInteractor: {fileID: 773190234}
+  leftRayInteractor: {fileID: 1964602102}
+  usePythonServer: 0
+  pythonClient: {fileID: 0}
+  colorMappings:
+  - colorName: red
+    color: {r: 1, g: 0, b: 0, a: 1}
+    keywords:
+    - red
+    - rouge
+  - colorName: blue
+    color: {r: 0, g: 0, b: 1, a: 1}
+    keywords:
+    - blue
+    - bleu
+  - colorName: green
+    color: {r: 0, g: 1, b: 0, a: 1}
+    keywords:
+    - green
+    - vert
+  - colorName: yellow
+    color: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+    keywords:
+    - yellow
+    - jaune
+  - colorName: white
+    color: {r: 1, g: 1, b: 1, a: 1}
+    keywords:
+    - white
+    - blanc
+  - colorName: black
+    color: {r: 0, g: 0, b: 0, a: 1}
+    keywords:
+    - black
+    - noir
+  - colorName: orange
+    color: {r: 1, g: 0.5, b: 0, a: 1}
+    keywords:
+    - orange
+  - colorName: purple
+    color: {r: 0.5, g: 0, b: 1, a: 1}
+    keywords:
+    - purple
+    - violet
+  - colorName: pink
+    color: {r: 1, g: 0.75, b: 0.8, a: 1}
+    keywords:
+    - pink
+    - rose
+  - colorName: gray
+    color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    keywords:
+    - gray
+    - grey
+    - gris
+  - colorName: brown
+    color: {r: 0.6, g: 0.3, b: 0, a: 1}
+    keywords:
+    - brown
+    - marron
+  showDebugRay: 1
+--- !u!4 &487324548
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 487324546}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.17565206, y: 0.050902344, z: 0.3905602}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &554351648
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 554351650}
+  - component: {fileID: 554351649}
+  m_Layer: 0
+  m_Name: PythonServerClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &554351649
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 554351648}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63daa37a28bd64043b3427be5c0eaa9a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  serverUrl: http://localhost:5000
+  llmEndpoint: /api/process_command
+  requestTimeout: 10
+--- !u!4 &554351650
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 554351648}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1708,6 +2608,57 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1124732203
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1124732205}
+  - component: {fileID: 1124732204}
+  m_Layer: 0
+  m_Name: RuntimeModelLoader
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1124732204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1124732203}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afeac7e3e1ee7994ca459a7433036975, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactableRootPrefab: {fileID: 6889721012027208169, guid: c901c864b60613e43bc584eb52c6ca87,
+    type: 3}
+  defaultMass: 1
+  useGravity: 1
+  colliderPadding: 0.02
+  showBoundingBox: 0
+  modelScale: 1
+--- !u!4 &1124732205
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1124732203}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.17565206, y: 0.050902344, z: 0.3905602}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3743,3 +4694,6 @@ SceneRoots:
   - {fileID: 730769973}
   - {fileID: 1375737370}
   - {fileID: 476427105}
+  - {fileID: 554351650}
+  - {fileID: 487324548}
+  - {fileID: 1124732205}

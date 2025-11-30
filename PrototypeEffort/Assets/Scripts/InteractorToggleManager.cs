@@ -17,7 +17,21 @@ public class InteractorToggleManager : MonoBehaviour
     [SerializeField] private InputActionReference toggleInteractorButton; // Only use right controller's button
 
     private bool useRay = false; // Shared state for both hands
+    
+    // Singleton for easy access from other scripts (like VoiceObjectSpawner)
+    public static InteractorToggleManager Instance { get; private set; }
 
+    private void Awake()
+    {
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Debug.LogWarning("Multiple InteractorToggleManagers detected!");
+        }
+    }
 
     private void OnEnable()
     {
@@ -50,5 +64,42 @@ public class InteractorToggleManager : MonoBehaviour
         if (leftDirectInteractor != null) leftDirectInteractor.gameObject.SetActive(!useRay);
         if (rightRayInteractor != null) rightRayInteractor.gameObject.SetActive(useRay);
         if (rightDirectInteractor != null) rightDirectInteractor.gameObject.SetActive(!useRay);
+        
+        this.useRay = useRay;
+        Debug.Log($"[InteractorToggleManager] Switched to {(useRay ? "Ray" : "Direct")} mode");
+    }
+    
+    // Public methods for external control (e.g., from LLM/Voice commands)
+    
+    /// <summary>
+    /// Switch to Ray interaction mode (pointing from distance)
+    /// </summary>
+    public void SetRayMode()
+    {
+        SetInteractorMode(true);
+    }
+    
+    /// <summary>
+    /// Switch to Direct interaction mode (hand grabbing)
+    /// </summary>
+    public void SetDirectMode()
+    {
+        SetInteractorMode(false);
+    }
+    
+    /// <summary>
+    /// Get current interaction mode
+    /// </summary>
+    public bool IsRayMode()
+    {
+        return useRay;
+    }
+    
+    /// <summary>
+    /// Get current interaction mode as string
+    /// </summary>
+    public string GetCurrentMode()
+    {
+        return useRay ? "ray" : "direct";
     }
 }
