@@ -10,17 +10,14 @@ using UnityEngine.Networking;
 public class PythonServerClient : MonoBehaviour
 {
     [Header("Server Configuration")]
-    // TODO: Update this with your actual Python server URL
-    [SerializeField] private string serverUrl = "http://localhost:5000"; // Change to your supervisor's server address
+    [SerializeField] private string serverUrl = "http://localhost:5000";
     
     [Header("API Endpoints")]
-    // TODO: Update these endpoints based on your supervisor's API
-    [SerializeField] private string llmEndpoint = "/api/process_command"; // Endpoint that processes voice commands with LLM
-    // TODO: Use this endpoint if you need a separate asset retrieval endpoint
-    // [SerializeField] private string assetEndpoint = "/api/get_asset"; // Endpoint that returns asset information
+    [SerializeField] private string llmEndpoint = "/api/process_command";
+    [SerializeField] private string healthEndpoint = "/ping";
     
     [Header("Timeout Settings")]
-    [SerializeField] private float requestTimeout = 10f; // Timeout for HTTP requests
+    [SerializeField] private float requestTimeout = 10f;
     
     // Singleton pattern for easy access
     public static PythonServerClient Instance { get; private set; }
@@ -51,15 +48,13 @@ public class PythonServerClient : MonoBehaviour
     
     private IEnumerator ProcessVoiceCommandCoroutine(string voiceCommand, Action<LLMResponse> onSuccess, Action<string> onError)
     {
-        // TODO: Adjust the JSON structure based on your supervisor's API requirements
-        // This is a common format, but your server might expect different fields
         string jsonData = JsonUtility.ToJson(new VoiceCommandRequest
         {
             command = voiceCommand,
             timestamp = DateTime.UtcNow.ToString("o")
         });
         
-        Debug.Log($"[PythonServerClient] Sending voice command to server: {voiceCommand}");
+        Debug.Log($"[PythonServerClient] Sending to LLM: {voiceCommand}");
         
         using (UnityWebRequest request = new UnityWebRequest(serverUrl + llmEndpoint, "POST"))
         {
@@ -67,10 +62,6 @@ public class PythonServerClient : MonoBehaviour
             request.uploadHandler = new UploadHandlerRaw(bodyRaw);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
-            
-            // TODO: If your server requires authentication, add headers here
-            // request.SetRequestHeader("Authorization", "Bearer YOUR_API_KEY");
-            
             request.timeout = (int)requestTimeout;
             
             yield return request.SendWebRequest();
@@ -78,17 +69,17 @@ public class PythonServerClient : MonoBehaviour
             if (request.result == UnityWebRequest.Result.Success)
             {
                 string responseText = request.downloadHandler.text;
-                Debug.Log($"[PythonServerClient] LLM Response: {responseText}");
+                Debug.Log($"[PythonServerClient] LLM Raw Response: {responseText}");
                 
                 try
                 {
-                    // TODO: Adjust this based on the actual response format from your supervisor's server
                     LLMResponse response = JsonUtility.FromJson<LLMResponse>(responseText);
+                    Debug.Log($"[PythonServerClient] Parsed response: {response.response}");
                     onSuccess?.Invoke(response);
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[PythonServerClient] Failed to parse LLM response: {e.Message}");
+                    Debug.LogError($"[PythonServerClient] Parse error: {e.Message}");
                     onError?.Invoke($"Failed to parse response: {e.Message}");
                 }
             }
@@ -153,22 +144,29 @@ public class PythonServerClient : MonoBehaviour
     {
         Debug.Log($"[PythonServerClient] Testing connection to: {serverUrl}");
         
-        // TODO: Update with a health check endpoint if available
-        using (UnityWebRequest request = UnityWebRequest.Get(serverUrl + "/health"))
+        using (UnityWebRequest request = UnityWebRequest.Get(serverUrl + healthEndpoint))
         {
             request.timeout = 5;
             yield return request.SendWebRequest();
             
             bool success = request.result == UnityWebRequest.Result.Success;
-            Debug.Log($"[PythonServerClient] Connection test: {(success ? "SUCCESS" : "FAILED")}");
+            
+            if (success)
+            {
+                Debug.Log($"[PythonServerClient] ✓ Connection successful: {request.downloadHandler.text}");
+            }
+            else
+            {
+                Debug.LogError($"[PythonServerClient] ✗ Connection failed: {request.error}");
+            }
+            
             onResult?.Invoke(success);
         }
     }
 }
 
 // ============================================================================
-// DATA STRUCTURES
-// TODO: Modify these based on your supervisor's actual API format
+// DATA STRUCTURES - OPTION A (Simple Text Response)
 // ============================================================================
 
 [Serializable]
@@ -176,40 +174,32 @@ public class VoiceCommandRequest
 {
     public string command;
     public string timestamp;
-    // TODO: Add any other fields your server expects, such as:
-    // public string userId;
-    // public string sessionId;
-    // public Dictionary<string, string> metadata;
 }
 
 [Serializable]
 public class LLMResponse
 {
-    // TODO: Update these fields based on what your supervisor's LLM returns
-    public string objectName;        // Name of the object to spawn (e.g., "chair", "table")
-    public string assetId;           // ShapeNet ID or unique identifier
-    public string assetUrl;          // URL to the GLTF file
-    public string category;          // Object category (optional)
-    public float confidence;         // LLM confidence score (optional)
+    // OPTION A: Simple text response from LLM
+    public string response;        // Free-form text response from LLM
+    public string command;         // Echo of the original command
     
-    // Optional: Position/rotation if LLM determines placement
+    // OPTION B fields (will be populated when we upgrade)
+    public string action;          // "spawn", "delete", "switch_mode", "query"
+    public string objectName;      // "chair", "table", etc.
+    public string assetId;         // ShapeNet ID
+    public string assetUrl;        // URL to GLTF file
+    public string category;        // Object category
+    public int quantity;           // Number to spawn
+    public string interactionMode; // "ray" or "direct"
+    public string color;           // "red", "blue", etc.
+    public float confidence;       // LLM confidence score
+    
+    // Optional fields
     public Vector3Data position;
     public Vector3Data rotation;
-    
-    // Optional: Additional metadata
     public string description;
     public string[] tags;
-    
-    // NEW: Interaction mode control
-    // TODO: Ask supervisor if LLM should control interaction mode
-    // Values: "ray", "direct", or null/empty to not change
-    public string interactionMode;
-    
-    // NEW: Color change support
-    // TODO: Ask supervisor if LLM should handle color changes
-    // Can be color name ("red", "blue") or RGB values
-    public string color;
-    public ColorRGB colorRGB;  // Alternative: RGB values
+    public ColorRGB colorRGB;
 }
 
 [Serializable]

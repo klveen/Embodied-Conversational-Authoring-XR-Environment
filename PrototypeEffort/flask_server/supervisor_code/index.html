@@ -1,0 +1,95 @@
+<!DOCTYPE html>                                                                 
+<html lang="en">                                                                
+<head>                                                                          
+    <meta charset="UTF-8">                                                      
+    <title>LLM Chat</title>                                                     
+    <style>                                                                     
+        body { font-family: sans-serif; max-width: 600px; margin: auto; padding:
+20px; }                                                                         
+        #chat-history {                                                         
+            height: 400px;                                                      
+            border: 1px solid #ccc;                                             
+            padding: 10px;                                                      
+            overflow-y: scroll;                                                 
+            margin-bottom: 10px;                                                
+        }                                                                       
+        .message { margin-bottom: 5px; }                                        
+        .user-prompt { color: blue; text-align: right; }                        
+        .llm-response { color: green; }                                         
+        #prompt-form { display: flex; }                                         
+        #prompt-input { flex-grow: 1; }                                         
+    </style>                                                                    
+</head>                                                                         
+<body>                                                                          
+    <h1>LLM Chat</h1>                                                           
+    <div id="chat-history"></div>                                               
+    <form id="prompt-form">                                                     
+        <input type="text" id="prompt-input" placeholder="Enter your prompt..." 
+autocomplete="off">                                                             
+        <button type="submit">Send</button>                                     
+    </form>                                                                     
+                                                                                
+    <script>                                                                    
+        document.getElementById('prompt-form').addEventListener('submit', async function(event) {
+            event.preventDefault();                                             
+                                                                                
+            const promptInput = document.getElementById('prompt-input');
+            const submitButton = document.querySelector('#prompt-form button');
+            const prompt = promptInput.value.trim();                            
+            if (!prompt) return;                                                
+                                                                                
+            // Disable form while waiting for response
+            promptInput.disabled = true;
+            submitButton.disabled = true;
+            promptInput.placeholder = 'Waiting for response...';
+
+            const chatHistory = document.getElementById('chat-history');        
+                                                                                
+            // Display user prompt                                              
+            const userMessage = document.createElement('div');                  
+            userMessage.classList.add('message', 'user-prompt');                
+            userMessage.textContent = `You: ${prompt}`;                         
+            chatHistory.appendChild(userMessage);                               
+                                                                                
+            // Clear input                                                      
+            promptInput.value = '';                                             
+                                                                                
+            try {
+                // Send to server and get response
+                const response = await fetch('/prompt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await response.json();
+                const llmResponse = data.response;
+
+                // Display LLM response
+                const llmMessage = document.createElement('div');
+                llmMessage.classList.add('message', 'llm-response');
+                llmMessage.textContent = `LLM: ${llmResponse}`;
+                chatHistory.appendChild(llmMessage);
+            } catch (error) {
+                console.error("Error fetching response:", error);
+                const errorMessage = document.createElement('div');
+                errorMessage.classList.add('message', 'llm-response');
+                errorMessage.style.color = 'red';
+                errorMessage.textContent = 'LLM: Error fetching response from server.';
+                chatHistory.appendChild(errorMessage);
+            } finally {
+                // Re-enable form
+                promptInput.disabled = false;
+                submitButton.disabled = false;
+                promptInput.placeholder = 'Enter your prompt...';
+                promptInput.focus();
+            }
+                                                                                
+            // Scroll to bottom                                                 
+            chatHistory.scrollTop = chatHistory.scrollHeight;                   
+        });                                                                     
+    </script>                                                                   
+</body>                                                                         
+</html>       

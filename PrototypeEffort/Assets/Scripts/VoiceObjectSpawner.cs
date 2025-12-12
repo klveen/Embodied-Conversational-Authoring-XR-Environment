@@ -15,9 +15,9 @@ public class VoiceObjectSpawner : MonoBehaviour
     // TODO: Toggle this on when ready to use Python server + LLM
     [SerializeField] private bool usePythonServer = false;
     [SerializeField] private PythonServerClient pythonClient;
+    [SerializeField] private LLMResponseDisplay llmDisplay;
     
     [Header("Object Library (Local Fallback)")]
-    [SerializeField] private GameObject defaultCubePrefab;
     [SerializeField] private List<VoiceObjectMapping> objectMappings = new List<VoiceObjectMapping>();
     
     [Header("Runtime GLB Loading")]
@@ -71,12 +71,24 @@ public class VoiceObjectSpawner : MonoBehaviour
     {
         Debug.Log($"Sending command to Python server: '{command}'");
         
+        // Show user's command
+        if (llmDisplay != null)
+        {
+            llmDisplay.ShowUserCommand(command);
+        }
+        
         pythonClient.ProcessVoiceCommand(
             command,
             // Success callback - LLM returned a result
             (LLMResponse response) => 
             {
-                Debug.Log($"LLM Response - Object: {response.objectName}, AssetID: {response.assetId}");
+                Debug.Log($"LLM Response: {response.response}");
+                
+                // Display LLM response in VR
+                if (llmDisplay != null && !string.IsNullOrEmpty(response.response))
+                {
+                    llmDisplay.ShowResponse(response.response);
+                }
                 
                 // NEW: Handle interaction mode changes from LLM
                 HandleInteractionModeChange(response);
@@ -99,6 +111,12 @@ public class VoiceObjectSpawner : MonoBehaviour
             (string error) => 
             {
                 Debug.LogError($"Python server error: {error}");
+                
+                // Show error in UI
+                if (llmDisplay != null)
+                {
+                    llmDisplay.ShowError(error);
+                }
                 // Fallback to local keyword matching
                 ProcessVoiceCommandLocally(command);
             }
@@ -146,6 +164,41 @@ public class VoiceObjectSpawner : MonoBehaviour
     // EXISTING: Local keyword matching (renamed for clarity)
     private async void ProcessVoiceCommandLocally(string command)
     {
+        // Check for LLM test command
+        if ((command.Contains("start") && command.Contains("testing")) || 
+            (command.Contains("test") && command.Contains("ai")) ||
+            command.Contains("test llm"))
+        {
+            Debug.Log("[VoiceSpawner] Testing LLM connection...");
+            TestLLMConnection();
+            return;
+        }
+        
+        // Check for network test command
+        if (command.Contains("test network") || command.Contains("test flask"))
+        {
+            Debug.Log("<color=cyan>TEST NETWORK COMMAND DETECTED!</color>");
+            TestNetworkGLBLoading testScript = FindObjectOfType<TestNetworkGLBLoading>();
+            if (testScript != null)
+            {
+                Debug.Log("<color=green>Found TestNetworkGLBLoading script, calling TestLoadFromNetwork()...</color>");
+                testScript.TestLoadFromNetwork();
+                Debug.Log("Network test triggered via voice command");
+            }
+            else
+            {
+                Debug.LogError("<color=red>TestNetworkGLBLoading script not found in scene! Make sure it's attached to a GameObject.</color>");
+            }
+            return;
+        }
+        
+        // Check for delete command
+        if (command.Contains("delete") || command.Contains("remove"))
+        {
+            DeleteObjectAtRaycast();
+            return;
+        }
+        
         List<VoiceObjectMapping> matchedMappings = FindAllMatchingMappings(command);
         
         if (matchedMappings.Count > 0)
@@ -169,13 +222,11 @@ public class VoiceObjectSpawner : MonoBehaviour
             else
             {
                 Debug.LogWarning($"Mapping for '{selectedMapping.objectName}' has no prefab or GLB path!");
-                SpawnObjectAtRaycast(defaultCubePrefab, "default cube");
             }
         }
         else
         {
-            Debug.LogWarning($"No matching object found for '{command}', spawning default cube");
-            SpawnObjectAtRaycast(defaultCubePrefab, "default cube");
+            Debug.LogWarning($"No matching object found for '{command}'");
         }
     }
     
@@ -219,7 +270,8 @@ public class VoiceObjectSpawner : MonoBehaviour
         // Try to get raycast hit from the active ray interactor
         if (activeRayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
         {
-            Vector3 spawnPosition = hit.point;
+            // Spawn slightly above the hit point to prevent clipping through walls
+            Vector3 spawnPosition = hit.point + hit.normal * runtimeModelLoader.spawnHeightOffset;
             Quaternion spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
             
             Debug.Log($"Loading GLB model from: {glbPath}");
@@ -297,6 +349,15 @@ public class VoiceObjectSpawner : MonoBehaviour
             // Optional: Align rotation with surface normal
             spawnedObject.transform.up = hit.normal;
             
+            // Temporarily disable gravity and make kinematic until object settles
+            Rigidbody rb = spawnedObject.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                // Re-enable physics after a short delay
+                StartCoroutine(EnablePhysicsAfterDelay(rb, 0.5f));
+            }
+            
             Debug.Log($"Spawned '{objectName}' at {spawnPosition}");
         }
         else
@@ -318,6 +379,93 @@ public class VoiceObjectSpawner : MonoBehaviour
         }
         
         return null;
+    }
+    
+    private void DeleteObjectAtRaycast()
+    {
+        // Get the active ray interactor
+        XRRayInteractor activeRayInteractor = GetActiveRayInteractor();
+        
+        if (activeRayInteractor == null)
+        {
+            Debug.LogWarning("[VoiceObjectSpawner] No active ray interactor found for deletion!");
+            return;
+        }
+        
+        // Try to get raycast hit from the active ray interactor
+        if (activeRayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        {
+            GameObject hitObject = hit.collider.gameObject;
+            
+            // Check if it's an AR plane (don't delete planes)
+            if (hitObject.GetComponent<UnityEngine.XR.ARFoundation.ARPlane>() != null)
+            {
+                Debug.Log("[VoiceObjectSpawner] Cannot delete AR planes!");
+                return;
+            }
+            
+            // Delete the object
+            Debug.Log($"[VoiceObjectSpawner] Deleting object: {hitObject.name}");
+            Destroy(hitObject);
+        }
+        else
+        {
+            Debug.LogWarning("[VoiceObjectSpawner] Ray interactor did not hit any object to delete!");
+        }
+    }
+    
+    private System.Collections.IEnumerator EnablePhysicsAfterDelay(Rigidbody rb, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.velocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+    }
+    
+    /// <summary>
+    /// Test LLM connection with a simple prompt
+    /// </summary>
+    private void TestLLMConnection()
+    {
+        if (pythonClient == null)
+        {
+            Debug.LogError("[VoiceSpawner] PythonServerClient not assigned!");
+            return;
+        }
+        
+        Debug.Log("[VoiceSpawner] Testing LLM connection with ping...");
+        
+        // First test server connection
+        pythonClient.TestConnection((bool success) =>
+        {
+            if (success)
+            {
+                Debug.Log("<color=green>[VoiceSpawner] ✓ Server connection successful!</color>");
+                
+                // Now test LLM with a simple prompt
+                Debug.Log("[VoiceSpawner] Sending test prompt to LLM...");
+                pythonClient.ProcessVoiceCommand(
+                    "Hello, can you hear me?",
+                    (LLMResponse response) =>
+                    {
+                        Debug.Log($"<color=green>[VoiceSpawner] ✓ LLM Response: {response.response}</color>");
+                        Debug.Log("<color=cyan>LLM test successful! You can now use voice commands.</color>");
+                    },
+                    (string error) =>
+                    {
+                        Debug.LogError($"<color=red>[VoiceSpawner] ✗ LLM test failed: {error}</color>");
+                    }
+                );
+            }
+            else
+            {
+                Debug.LogError("<color=red>[VoiceSpawner] ✗ Server connection failed! Make sure llm_server.py is running.</color>");
+            }
+        });
     }
 }
 

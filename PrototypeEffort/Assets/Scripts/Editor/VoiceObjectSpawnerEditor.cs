@@ -81,20 +81,25 @@ public class VoiceObjectSpawnerEditor : Editor
             "chair", "clock", "lamp", "sofa", "table"
         };
         
-        // Get existing mappings
+        // STEP 1: Copy GLB files to StreamingAssets (matching maxModelsPerCategory)
+        string streamingAssetsPath = Path.Combine(Application.dataPath, "StreamingAssets", "shapenet_data");
+        CopyGLBFilesToStreamingAssets(categories, streamingAssetsPath);
+        
+        // STEP 2: Clear existing mappings
         SerializedObject serializedSpawner = new SerializedObject(spawner);
         SerializedProperty mappingsProperty = serializedSpawner.FindProperty("objectMappings");
+        mappingsProperty.ClearArray();
         
         int totalAdded = 0;
-        int startingCount = mappingsProperty.arraySize;
         
+        // STEP 3: Generate mappings from StreamingAssets (now matches the files we just copied)
         foreach (string category in categories)
         {
-            string categoryPath = Path.Combine(shapeNetDataPath, category);
+            string categoryPath = Path.Combine(streamingAssetsPath, category);
             
             if (!Directory.Exists(categoryPath))
             {
-                Debug.LogWarning($"Category folder not found: {categoryPath}");
+                Debug.LogWarning($"Category folder not found in StreamingAssets: {categoryPath}");
                 continue;
             }
             
@@ -102,13 +107,11 @@ public class VoiceObjectSpawnerEditor : Editor
             
             if (glbFiles.Length == 0)
             {
-                Debug.LogWarning($"No GLB files found in: {categoryPath}");
+                Debug.LogWarning($"No GLB files found in StreamingAssets: {categoryPath}");
                 continue;
             }
             
-            int modelsToAdd = (maxModelsPerCategory > 0)
-                ? Mathf.Min(glbFiles.Length, maxModelsPerCategory)
-                : glbFiles.Length;
+            int modelsToAdd = glbFiles.Length; // Use exactly what's in StreamingAssets
             
             for (int i = 0; i < modelsToAdd; i++)
             {
@@ -139,18 +142,22 @@ public class VoiceObjectSpawnerEditor : Editor
         
         serializedSpawner.ApplyModifiedProperties();
         
+        // Refresh AssetDatabase so Unity sees new StreamingAssets files
+        AssetDatabase.Refresh();
+        
         if (totalAdded > 0)
         {
             EditorUtility.DisplayDialog(
                 "Mappings Generated!",
-                $"Successfully added {totalAdded} new mappings!\n\n" +
-                $"Previous count: {startingCount}\n" +
-                $"New count: {mappingsProperty.arraySize}\n\n" +
-                "Check the Object Mappings list in the inspector.",
+                $"Successfully generated {totalAdded} mappings!\n\n" +
+                $"• Copied {maxModelsPerCategory} models per category to StreamingAssets\n" +
+                $"• Created {totalAdded} object mappings\n" +
+                $"• Cleared previous mappings\n\n" +
+                "Ready to build for Quest 3!",
                 "OK"
             );
             
-            Debug.Log($"✓ Generated {totalAdded} ShapeNet mappings across {categories.Count} categories");
+            Debug.Log($"✓ Generated {totalAdded} ShapeNet mappings and copied GLB files to StreamingAssets");
         }
         else
         {
@@ -163,6 +170,71 @@ public class VoiceObjectSpawnerEditor : Editor
                 "OK"
             );
         }
+    }
+    
+    private void CopyGLBFilesToStreamingAssets(List<string> categories, string streamingAssetsPath)
+    {
+        if (!Directory.Exists(streamingAssetsPath))
+        {
+            Directory.CreateDirectory(streamingAssetsPath);
+        }
+        
+        int totalCopied = 0;
+        
+        foreach (string category in categories)
+        {
+            string sourceCategory = Path.Combine(shapeNetDataPath, category);
+            string destCategory = Path.Combine(streamingAssetsPath, category);
+            
+            if (!Directory.Exists(sourceCategory))
+            {
+                Debug.LogWarning($"Source category not found: {sourceCategory}");
+                continue;
+            }
+            
+            // Get all GLB files from source
+            string[] sourceFiles = Directory.GetFiles(sourceCategory, "*.glb");
+            
+            if (sourceFiles.Length == 0)
+            {
+                Debug.LogWarning($"No GLB files in source: {sourceCategory}");
+                continue;
+            }
+            
+            // Determine how many to copy
+            int filesToCopy = (maxModelsPerCategory > 0) 
+                ? Mathf.Min(sourceFiles.Length, maxModelsPerCategory) 
+                : sourceFiles.Length;
+            
+            // Create destination folder
+            if (!Directory.Exists(destCategory))
+            {
+                Directory.CreateDirectory(destCategory);
+            }
+            else
+            {
+                // Clear existing files in this category folder
+                foreach (string existingFile in Directory.GetFiles(destCategory, "*.glb"))
+                {
+                    File.Delete(existingFile);
+                }
+            }
+            
+            // Copy files
+            for (int i = 0; i < filesToCopy; i++)
+            {
+                string sourceFile = sourceFiles[i];
+                string fileName = Path.GetFileName(sourceFile);
+                string destFile = Path.Combine(destCategory, fileName);
+                
+                File.Copy(sourceFile, destFile, true);
+                totalCopied++;
+            }
+            
+            Debug.Log($"Copied {filesToCopy} GLB files for category: {category}");
+        }
+        
+        Debug.Log($"Total GLB files copied to StreamingAssets: {totalCopied}");
     }
     
     private void ScanShapeNetData()
