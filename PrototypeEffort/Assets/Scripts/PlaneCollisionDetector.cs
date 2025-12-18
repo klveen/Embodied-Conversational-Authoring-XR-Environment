@@ -11,8 +11,8 @@ using System.Collections.Generic;
 public class PlaneCollisionDetector : MonoBehaviour
 {
     [Header("Visual Feedback")]
+    [SerializeField] private Material invalidMaterial; // Drag red semi-transparent material here
     [SerializeField] private Color validColor = Color.white;
-    [SerializeField] private Color invalidColor = new Color(1f, 0f, 0f, 0.5f); // Red semi-transparent
     
     private Dictionary<Renderer, Material[]> originalMaterialsPerRenderer = new Dictionary<Renderer, Material[]>();
     private Dictionary<Renderer, Material[]> instancedMaterialsPerRenderer = new Dictionary<Renderer, Material[]>();
@@ -39,16 +39,25 @@ public class PlaneCollisionDetector : MonoBehaviour
         {
             if (r != null && r.sharedMaterials != null)
             {
-                // Store original shared materials
-                originalMaterialsPerRenderer[r] = r.sharedMaterials;
-                
-                // Create instanced materials for modifications
-                Material[] instancedMats = new Material[r.sharedMaterials.Length];
-                for (int i = 0; i < r.sharedMaterials.Length; i++)
-                {
-                    instancedMats[i] = new Material(r.sharedMaterials[i]);
-                }
-                instancedMaterialsPerRenderer[r] = instancedMats;
+                // Store CURRENT materials (which may already have color applied)
+                Material[] currentMats = r.materials; // This gets the current instanced materials
+                originalMaterialsPerRenderer[r] = currentMats;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Call this after applying colors to update the stored "original" materials
+    /// so collision detection doesn't override the user's color
+    /// </summary>
+    public void UpdateStoredMaterials()
+    {
+        foreach (Renderer r in renderers)
+        {
+            if (r != null)
+            {
+                // Update stored materials to current state (preserves user colors)
+                originalMaterialsPerRenderer[r] = r.materials;
             }
         }
     }
@@ -214,41 +223,22 @@ public class PlaneCollisionDetector : MonoBehaviour
         
         isShowingInvalid = true;
         
+        if (invalidMaterial == null)
+        {
+            Debug.LogWarning("[PlaneCollisionDetector] Invalid material not assigned in Inspector! Assign a red semi-transparent material.");
+            return;
+        }
+        
+        // Replace all materials with the invalid material
         foreach (Renderer r in renderers)
         {
-            if (r != null && instancedMaterialsPerRenderer.ContainsKey(r))
+            if (r != null)
             {
-                Material[] mats = instancedMaterialsPerRenderer[r];
-                
-                // Apply red transparent color and settings
+                Material[] mats = new Material[r.materials.Length];
                 for (int i = 0; i < mats.Length; i++)
                 {
-                    mats[i].color = invalidColor;
-                    
-                    // Enable transparency for Standard shader
-                    if (mats[i].HasProperty("_Mode"))
-                    {
-                        mats[i].SetFloat("_Mode", 3); // Transparent mode
-                    }
-                    if (mats[i].HasProperty("_SrcBlend"))
-                    {
-                        mats[i].SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    }
-                    if (mats[i].HasProperty("_DstBlend"))
-                    {
-                        mats[i].SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    }
-                    if (mats[i].HasProperty("_ZWrite"))
-                    {
-                        mats[i].SetFloat("_ZWrite", 0);
-                    }
-                    
-                    mats[i].DisableKeyword("_ALPHATEST_ON");
-                    mats[i].EnableKeyword("_ALPHABLEND_ON");
-                    mats[i].DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                    mats[i].renderQueue = 3000;
+                    mats[i] = invalidMaterial;
                 }
-                
                 r.materials = mats;
             }
         }
@@ -260,7 +250,8 @@ public class PlaneCollisionDetector : MonoBehaviour
         {
             if (r != null && originalMaterialsPerRenderer.ContainsKey(r))
             {
-                r.sharedMaterials = originalMaterialsPerRenderer[r];
+                // Restore the materials (which preserve user-applied colors)
+                r.materials = originalMaterialsPerRenderer[r];
             }
         }
     }
