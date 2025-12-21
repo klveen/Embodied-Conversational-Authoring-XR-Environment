@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
@@ -44,60 +45,53 @@ public class RuntimeModelLoader : MonoBehaviour
     [Tooltip("Height offset above raycast point to prevent clipping through walls")]
     public float spawnHeightOffset = 0.15f;
     
-    private string basePath;
-    private bool useStreamingAssets;
-    
-    // Per-category scale multipliers (chair = 1.0 reference)
-    private System.Collections.Generic.Dictionary<string, float> categoryScales = new System.Collections.Generic.Dictionary<string, float>()
+    [Header("Network Loading (Quest)")]
+    [Tooltip("Flask server URL for loading GLB files over network")]
+    public string flaskServerURL = "http://192.168.178.74:5000";
+
+    /// <summary>
+    /// Loads a GLB model, automatically choosing local file (PC) or HTTP (Quest).
+    /// </summary>
+    /// <param name="glbPath">Full path for PC</param>
+    /// <param name="modelId">Model ID for Quest HTTP loading</param>
+    /// <param name="spawnPosition">World position to spawn at</param>
+    /// <param name="spawnRotation">World rotation to spawn with</param>
+    public async Task<GameObject> LoadModel(string glbPath, string modelId, Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        { "bed", 2.5f },
-        { "bookshelf", 2.0f },
-        { "chair", 1.0f },
-        { "table", 1.0f },
-        { "sofa", 2.0f },
-        { "lamp", 1.0f },
-        { "cabinet", 1.5f },
-        { "basket", 0.6f },
-        { "bench", 1.5f },
-        { "clock", 1.5f }
-    };
-    
-    private void Awake()
-    {
-        // Set base path depending on platform
+        // Debug: Log what we received
+        Debug.Log($"[RuntimeModelLoader] LoadModel called with glbPath='{glbPath}', modelId='{modelId}' (length={modelId?.Length ?? 0})");
+        
+        // Check if running on Quest (Android)
         if (Application.platform == RuntimePlatform.Android)
         {
-            // Quest 3: StreamingAssets requires special URL handling
-            basePath = "shapenet_data";
-            useStreamingAssets = true;
-            Debug.Log($"[RuntimeModelLoader] Android detected - using StreamingAssets");
+            // Quest: Load from HTTP
+            if (string.IsNullOrEmpty(modelId))
+            {
+                Debug.LogError($"[RuntimeModelLoader] modelId is empty! Cannot construct URL. glbPath was: {glbPath}");
+                return null;
+            }
+            string url = $"{flaskServerURL}/glb/{modelId}";
+            Debug.Log($"[RuntimeModelLoader] Quest detected - loading from: {url}");
+            return await LoadModelFromURL(url, spawnPosition, spawnRotation);
         }
         else
         {
-            // Editor/PC: Use user's shapenet_data folder
-            basePath = System.IO.Path.Combine(
-                System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile),
-                "shapenet_data"
-            );
-            useStreamingAssets = false;
-            Debug.Log($"[RuntimeModelLoader] PC/Editor detected - using local path: {basePath}");
+            // PC: Load from local file
+            Debug.Log($"[RuntimeModelLoader] PC detected - loading from: {glbPath}");
+            return await LoadAndSpawnModel(glbPath, spawnPosition, spawnRotation);
         }
     }
 
     /// <summary>
-    /// Loads a .glb file from disk and wraps it in an interactable shell.
+    /// Loads a .glb file from an absolute path and wraps it in an interactable shell.
+    /// Uses original GLB scale (no category-based scaling).
     /// </summary>
-    /// <param name="glbFilePath">Full path to the .glb file</param>
+    /// <param name="glbFilePath">Full absolute path to the .glb file</param>
     /// <param name="spawnPosition">World position to spawn at</param>
     /// <param name="spawnRotation">World rotation to spawn with</param>
     /// <returns>The spawned GameObject with model attached</returns>
     public async Task<GameObject> LoadAndSpawnModel(string glbFilePath, Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        if (string.IsNullOrEmpty(basePath))
-        {
-            Awake(); // Initialize if not done yet
-        }
-        
         // Create root shell from prefab
         GameObject rootObject = Instantiate(interactableRootPrefab, spawnPosition, spawnRotation);
         rootObject.name = System.IO.Path.GetFileNameWithoutExtension(glbFilePath);
@@ -108,11 +102,8 @@ public class RuntimeModelLoader : MonoBehaviour
         // Ensure root has required components
         SetupRootComponents(rootObject);
 
-        // Get category from path for per-category scaling
-        string category = System.IO.Path.GetDirectoryName(glbFilePath)?.Split(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)[^1];
-        float categoryScale = categoryScales.ContainsKey(category) ? categoryScales[category] : 1f;
-        float finalScale = modelScale * categoryScale;
-        Debug.Log($"[RuntimeModelLoader] Category '{category}' scale: {categoryScale}x (final: {finalScale})");
+        // Use original GLB scale with optional global multiplier
+        float finalScale = modelScale;
         
         // Create container for the model
         GameObject modelContainer = new GameObject("Model");
@@ -123,21 +114,18 @@ public class RuntimeModelLoader : MonoBehaviour
 
         try
         {
-            string fullPath;
+            // Normalize path for glTFast - use forward slashes and ensure it's a proper file path
+            string fullPath = glbFilePath.Replace("\\", "/");
             
-            // Build path based on platform
-            if (useStreamingAssets)
+            // Verify file exists before attempting load
+            if (!System.IO.File.Exists(glbFilePath))
             {
-                // Android: Use StreamingAssets URL format
-                fullPath = System.IO.Path.Combine(Application.streamingAssetsPath, basePath, glbFilePath).Replace("\\", "/");
-                Debug.Log($"[RuntimeModelLoader] Loading from StreamingAssets: {fullPath}");
+                Debug.LogError($"[RuntimeModelLoader] File does not exist: {glbFilePath}");
+                Destroy(rootObject);
+                return null;
             }
-            else
-            {
-                // PC/Editor: Use file system path
-                fullPath = System.IO.Path.Combine(basePath, glbFilePath);
-                Debug.Log($"[RuntimeModelLoader] Loading from file system: {fullPath}");
-            }
+            
+            Debug.Log($"[RuntimeModelLoader] Loading GLB from: {fullPath}");
             
             // Load the GLB file using GLTFast
             var gltfAsset = modelContainer.AddComponent<GltfAsset>();
@@ -201,7 +189,21 @@ public class RuntimeModelLoader : MonoBehaviour
                 
                 // Calculate bounds and setup collider
                 Bounds combinedBounds = CalculateCombinedBounds(modelContainer);
+                
+                // Auto-correct orientation based on bounding box
+                CorrectModelOrientation(modelContainer, combinedBounds);
+                
+                // Recalculate bounds after orientation correction
+                combinedBounds = CalculateCombinedBounds(modelContainer);
+                
+                // Setup collider first (before adjusting position)
                 SetupCollider(rootObject, combinedBounds);
+                
+                // Adjust spawn position to sit on surface based on bounds minimum Y
+                // Move object up so its bottom (bounds.min.y) sits at spawn point
+                float bottomToCenter = -combinedBounds.min.y; // Distance from center to bottom
+                rootObject.transform.position += Vector3.up * bottomToCenter;
+                Debug.Log($"[RuntimeModelLoader] Adjusted spawn position up by {bottomToCenter:F3}m to sit bottom on surface");
 
                 // Optional: Show bounding box visual
                 if (showBoundingBox)
@@ -209,23 +211,23 @@ public class RuntimeModelLoader : MonoBehaviour
                     CreateBoundingBoxVisual(rootObject, combinedBounds);
                 }
                 
-                // Temporarily make kinematic to prevent falling during setup
+                // Set kinematic BEFORE activating to prevent physics issues
                 Rigidbody rb = rootObject.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
                     rb.isKinematic = true;
-                }
-                
-                // NOW show the object (materials are fixed, no pink flash!)
-                rootObject.SetActive(true);
-                
-                // Re-enable physics after a short delay to let everything settle
-                if (rb != null)
-                {
-                    await Task.Delay(500);
-                    rb.isKinematic = false;
                     rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
+                }
+                
+                // NOW show the object (materials are fixed, position adjusted, kinematic)
+                rootObject.SetActive(true);
+                
+                // Wait for physics to settle, then enable
+                if (rb != null)
+                {
+                    await Task.Delay(100); // Shorter delay since we're already stable
+                    rb.isKinematic = false;
                 }
 
                 Debug.Log($"[RuntimeModelLoader] Successfully spawned: {glbFilePath}");
@@ -410,6 +412,77 @@ public class RuntimeModelLoader : MonoBehaviour
         Debug.Log($"[RuntimeModelLoader] Tight bounds: center={center}, size={size}");
         
         return new Bounds(center, size);
+    }
+
+    /// <summary>
+    /// Auto-corrects model orientation to ensure proper "up" direction.
+    /// Finds which axis has the most mass at one extreme (the "bottom").
+    /// </summary>
+    private void CorrectModelOrientation(GameObject modelContainer, Bounds bounds)
+    {
+        MeshFilter[] meshFilters = modelContainer.GetComponentsInChildren<MeshFilter>();
+        if (meshFilters.Length == 0) return;
+        
+        Transform rootTransform = modelContainer.transform.parent;
+        
+        // Collect all vertices in local space
+        List<Vector3> allVertices = new List<Vector3>();
+        foreach (MeshFilter mf in meshFilters)
+        {
+            if (mf.sharedMesh == null) continue;
+            
+            foreach (Vector3 vertex in mf.sharedMesh.vertices)
+            {
+                Vector3 worldVertex = mf.transform.TransformPoint(vertex);
+                Vector3 localVertex = rootTransform.InverseTransformPoint(worldVertex);
+                allVertices.Add(localVertex);
+            }
+        }
+        
+        if (allVertices.Count == 0) return;
+        
+        // Calculate center of mass
+        Vector3 centerOfMass = Vector3.zero;
+        foreach (Vector3 v in allVertices)
+        {
+            centerOfMass += v;
+        }
+        centerOfMass /= allVertices.Count;
+        
+        // For each axis, calculate how much mass is at the negative extreme
+        // The axis with most mass at bottom should be the "down" direction
+        float xBottomMass = 0, yBottomMass = 0, zBottomMass = 0;
+        
+        foreach (Vector3 v in allVertices)
+        {
+            // Weight by how far below center of mass (negative = below)
+            if (v.x < centerOfMass.x) xBottomMass += (centerOfMass.x - v.x);
+            if (v.y < centerOfMass.y) yBottomMass += (centerOfMass.y - v.y);
+            if (v.z < centerOfMass.z) zBottomMass += (centerOfMass.z - v.z);
+        }
+        
+        Debug.Log($"[RuntimeModelLoader] Bottom mass - X: {xBottomMass:F2}, Y: {yBottomMass:F2}, Z: {zBottomMass:F2}");
+        
+        // The axis with most bottom mass should point down (negative Y in Unity)
+        float maxBottomMass = Mathf.Max(xBottomMass, yBottomMass, zBottomMass);
+        
+        if (Mathf.Approximately(maxBottomMass, xBottomMass))
+        {
+            // X has most bottom mass - rotate so -X becomes -Y
+            Debug.Log("[RuntimeModelLoader] Correcting orientation: X axis has bottom, rotating 90° around Z");
+            modelContainer.transform.localRotation = Quaternion.Euler(0, 0, 90);
+        }
+        else if (Mathf.Approximately(maxBottomMass, zBottomMass))
+        {
+            // Z has most bottom mass - rotate so -Z becomes -Y
+            Debug.Log("[RuntimeModelLoader] Correcting orientation: Z axis has bottom, rotating -90° around X");
+            modelContainer.transform.localRotation = Quaternion.Euler(-90, 0, 0);
+        }
+        else
+        {
+            // Y already has most bottom mass - correct orientation
+            Debug.Log("[RuntimeModelLoader] Orientation correct: Y axis already has bottom");
+        }
     }
 
     /// <summary>
@@ -608,32 +681,41 @@ public class RuntimeModelLoader : MonoBehaviour
     }
 
     /// <summary>
-    /// Convenience method to load from the shapenet_data folder.
+    /// Loads a GLB model from full path (no category needed).
     /// </summary>
-    /// <param name="category">Category folder name (e.g., "bed", "chair")</param>
-    /// <param name="fileName">GLB filename (e.g., "model.glb")</param>
+    /// <param name="glbPath">Full absolute path to GLB file</param>
     /// <param name="spawnPosition">World position to spawn at</param>
     /// <param name="spawnRotation">World rotation to spawn with</param>
+    public async Task<GameObject> LoadModelFromPath(string glbPath, Vector3 spawnPosition, Quaternion spawnRotation)
+    {
+        Debug.Log($"[RuntimeModelLoader] LoadModelFromPath called: {glbPath}");
+        
+        // Use the main LoadAndSpawnModel method with full path
+        return await LoadAndSpawnModel(glbPath, spawnPosition, spawnRotation);
+    }
+    
+    /// <summary>
+    /// DEPRECATED: Use LoadModelFromPath instead.
+    /// Legacy method for backward compatibility.
+    /// </summary>
+    [System.Obsolete("Use LoadModelFromPath with full path instead")]
     public async Task<GameObject> LoadShapeNetModel(string category, string fileName, Vector3 spawnPosition, Quaternion spawnRotation)
     {
-        // Build relative path (e.g., "chair/model.glb")
-        string relativePath = $"{category}/{fileName}";
-        
-        Debug.Log($"[RuntimeModelLoader] LoadShapeNetModel called: category={category}, fileName={fileName}");
-        
-        // Use the main LoadAndSpawnModel method which handles platform-specific paths
-        return await LoadAndSpawnModel(relativePath, spawnPosition, spawnRotation);
+        Debug.LogWarning("[RuntimeModelLoader] LoadShapeNetModel is deprecated. Use LoadModelFromPath with full path instead.");
+        await Task.CompletedTask; // Avoid async warning
+        // Fallback behavior - won't work without proper path
+        return null;
     }
     
     /// <summary>
     /// Loads a GLB model from a URL (for remote/cloud hosted models).
+    /// Uses original GLB scale (no category-based scaling).
     /// </summary>
     /// <param name="url">Full URL to the .glb file (http:// or https://)</param>
     /// <param name="spawnPosition">World position to spawn at</param>
     /// <param name="spawnRotation">World rotation to spawn with</param>
-    /// <param name="category">Optional category for scaling (e.g., "chair", "table")</param>
     /// <returns>The spawned GameObject with model attached</returns>
-    public async Task<GameObject> LoadModelFromURL(string url, Vector3 spawnPosition, Quaternion spawnRotation, string category = null)
+    public async Task<GameObject> LoadModelFromURL(string url, Vector3 spawnPosition, Quaternion spawnRotation)
     {
         // Create root shell from prefab
         GameObject rootObject = Instantiate(interactableRootPrefab, spawnPosition, spawnRotation);
@@ -645,10 +727,9 @@ public class RuntimeModelLoader : MonoBehaviour
         // Ensure root has required components
         SetupRootComponents(rootObject);
 
-        // Apply per-category scaling if category provided
-        float categoryScale = !string.IsNullOrEmpty(category) && categoryScales.ContainsKey(category) ? categoryScales[category] : 1f;
-        float finalScale = modelScale * categoryScale;
-        Debug.Log($"[RuntimeModelLoader] Loading from URL: {url}, Category: '{category}', Scale: {finalScale}x");
+        // Use original GLB scale with optional global multiplier
+        float finalScale = modelScale;
+        Debug.Log($"[RuntimeModelLoader] Loading from URL: {url}, Scale: {finalScale}x");
         
         // Create container for the model
         GameObject modelContainer = new GameObject("Model");

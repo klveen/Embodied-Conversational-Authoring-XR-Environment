@@ -4,7 +4,7 @@ Uses Claude's native tool calling for reliable structured outputs.
 Fallback to Jan AI for offline testing.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import json
 import re
@@ -17,8 +17,41 @@ MODEL_NAME = "claude-sonnet-4-0"  # Tested and working in Jan AI
 # Your working API key
 ANTHROPIC_API_KEY = "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"
 
+# Path to GLB files
+GLB_FOLDER = r"C:\Users\s2733099\ShapenetData\GLB"
+INVENTORY_CSV = r"C:\Users\s2733099\ShapenetData\inventory.csv"
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for Unity WebGL if needed
+
+# Load inventory at startup
+INVENTORY = {}  # {"chair": [{"id": "abc123", "categories": "Chair,OfficeChair"}, ...], ...}
+
+def load_inventory():
+    """Load inventory.csv and organize by main category"""
+    global INVENTORY
+    try:
+        with open(INVENTORY_CSV, 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split(',', 1)
+                if len(parts) == 2:
+                    model_id = parts[0].strip()
+                    categories = parts[1].strip().strip('"')  # Remove quotes if present
+                    main_category = categories.split(',')[0].lower()
+                    
+                    if main_category not in INVENTORY:
+                        INVENTORY[main_category] = []
+                    
+                    INVENTORY[main_category].append({
+                        "id": model_id,
+                        "categories": categories
+                    })
+        
+        print(f"[Inventory] Loaded {sum(len(v) for v in INVENTORY.values())} models across {len(INVENTORY)} categories")
+    except Exception as e:
+        print(f"[Inventory] Error loading: {e}")
+
+load_inventory()
 
 # Direct Anthropic client (bypass Jan AI)
 client = Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -67,7 +100,7 @@ make this blue → {"action":"modify","color":"blue"}"""
 CLAUDE_TOOLS = [
     {
         "name": "spawn_furniture",
-        "description": "Spawn a piece of furniture in the AR environment. Use this when the user wants to create, place, spawn, or add furniture.",
+        "description": "Spawn a piece of furniture in the AR environment. Use this when the user wants to create, place, spawn, or add furniture. Choose the most contextually appropriate model variant (e.g., OfficeChair for desk, Recliner for relaxing).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -75,6 +108,10 @@ CLAUDE_TOOLS = [
                     "type": "string",
                     "enum": ["chair", "table", "sofa", "couch", "lamp", "bed", "desk", "shelf", "bench", "stool"],
                     "description": "The type of furniture object to spawn"
+                },
+                "modelId": {
+                    "type": "string",
+                    "description": "REQUIRED: The specific model ID from the inventory to spawn. Choose based on context and subcategories."
                 },
                 "color": {
                     "type": "string",
@@ -87,7 +124,7 @@ CLAUDE_TOOLS = [
                     "default": 1
                 }
             },
-            "required": ["objectName"]  # Only objectName is required, color is optional
+            "required": ["objectName", "modelId"]
         }
     },
     {
@@ -143,15 +180,21 @@ def process_command():
     try:
         if is_claude:
             # === CLAUDE APPROACH: Native Tool Use ===
-            # Direct call to Anthropic API with native tool format
+            # Build inventory context for Claude
+            inventory_context = "\n\nAvailable Models:\n"
+            for category, models in list(INVENTORY.items())[:10]:  # Limit to avoid token overflow
+                inventory_context += f"\n{category.upper()}:\n"
+                for model in models[:15]:  # Show first 15 of each category
+                    inventory_context += f"  - ID: {model['id']}, Types: {model['categories']}\n"
             
             response = client.messages.create(
                 model=MODEL_NAME,
-                max_tokens=200,
+                max_tokens=300,
+                system=f"You are a VR furniture placement assistant. Choose the most contextually appropriate model ID based on user intent.{inventory_context}",
                 tools=[
                     {
                         "name": "spawn_furniture",
-                        "description": "Spawn furniture in AR space. Use when user wants to create/place/spawn furniture.",
+                        "description": "Spawn furniture in AR space. Choose model ID based on context (OfficeChair for desk, Recliner for comfort, etc.)",
                         "input_schema": {
                             "type": "object",
                             "properties": {
@@ -159,6 +202,10 @@ def process_command():
                                     "type": "string",
                                     "enum": ["chair", "table", "sofa", "couch", "lamp", "bed", "desk", "shelf"],
                                     "description": "Type of furniture"
+                                },
+                                "modelId": {
+                                    "type": "string",
+                                    "description": "REQUIRED: Specific model ID from inventory"
                                 },
                                 "color": {
                                     "type": "string",
@@ -170,7 +217,7 @@ def process_command():
                                     "description": "Number to spawn (default 1)"
                                 }
                             },
-                            "required": ["objectName"]
+                            "required": ["objectName", "modelId"]
                         }
                     },
                     {
@@ -281,6 +328,42 @@ def process_command():
         print(f"[LLM Server] {error_msg}")
         return jsonify({"error": error_msg}), 500
 
+@app.route('/glb/<glb_id>', methods=['GET'])
+def serve_glb(glb_id):
+    """Serve GLB files to Quest 3 over network"""
+    try:
+        # Construct path to GLB file
+        glb_path = os.path.join(GLB_FOLDER, f"{glb_id}.glb")
+        
+        # Check if file exists
+        if not os.path.exists(glb_path):
+            print(f"[GLB Server] File not found: {glb_path}")
+            return jsonify({"error": f"GLB file not found: {glb_id}"}), 404
+        
+        print(f"[GLB Server] Serving: {glb_id}.glb ({os.path.getsize(glb_path)} bytes)")
+        return send_file(glb_path, mimetype='model/gltf-binary')
+        
+    except Exception as e:
+        error_msg = f"GLB serving error: {str(e)}"
+        print(f"[GLB Server] {error_msg}")
+        return jsonify({"error": error_msg}), 500
+
+@app.route('/inventory.csv', methods=['GET'])
+def serve_inventory():
+    """Serve inventory CSV to Quest 3"""
+    try:
+        if not os.path.exists(INVENTORY_CSV):
+            print(f"[CSV Server] File not found: {INVENTORY_CSV}")
+            return jsonify({"error": "Inventory CSV not found"}), 404
+        
+        print(f"[CSV Server] Serving inventory.csv ({os.path.getsize(INVENTORY_CSV)} bytes)")
+        return send_file(INVENTORY_CSV, mimetype='text/csv')
+        
+    except Exception as e:
+        error_msg = f"CSV serving error: {str(e)}"
+        print(f"[CSV Server] {error_msg}")
+        return jsonify({"error": error_msg}), 500
+
 if __name__ == '__main__':
     print("\n" + "="*60)
     print("LLM Server Starting - Structured JSON Responses")
@@ -295,6 +378,10 @@ if __name__ == '__main__':
     print("\nEndpoints:")
     print("  GET  /ping - Health check")
     print("  POST /api/process_command - Process voice commands")
+    print("  GET  /glb/<id> - Serve GLB files to Quest")
+    print("  GET  /inventory.csv - Serve inventory CSV")
+    print(f"\nGLB Folder: {GLB_FOLDER}")
+    print(f"Inventory CSV: {INVENTORY_CSV}")
     print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=True)

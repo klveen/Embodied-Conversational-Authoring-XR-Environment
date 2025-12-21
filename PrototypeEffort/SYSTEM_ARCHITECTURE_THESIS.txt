@@ -1,0 +1,796 @@
+================================================================================
+VR FURNITURE PLACEMENT SYSTEM - COMPREHENSIVE ARCHITECTURE DOCUMENTATION
+================================================================================
+Version: 2.0 - LLM-Driven Context-Aware Model Selection
+Date: December 21, 2025
+Author: Thesis Prototype Implementation
+
+This document provides a comprehensive technical overview of the voice-controlled
+VR furniture placement system, including historical development decisions,
+current architecture, and component interconnections.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. System Overview
+2. Historical Development & Design Decisions
+3. Current Architecture
+4. Component Details
+   4.1 Unity VR Application
+   4.2 Flask Python Server
+   4.3 Claude AI Integration
+   4.4 3D Model Database (ShapeNet)
+5. Data Flow & Communication Protocols
+6. Network Architecture
+7. Technical Specifications
+8. File Reference
+
+================================================================================
+1. SYSTEM OVERVIEW
+================================================================================
+
+The system enables natural language-driven 3D furniture placement in virtual 
+reality. Users speak commands like "put a chair in front of my desk" and the 
+system:
+
+  1. Captures voice input via Meta Quest 3's speech-to-text
+  2. Sends the transcribed command to a Flask server
+  3. Flask forwards to Claude AI with inventory context
+  4. Claude selects the most contextually appropriate 3D model
+  5. Unity downloads and renders the model at the pointed location
+  6. Automatic orientation correction ensures proper placement
+
+Key Innovation: The LLM doesn't just parse commands—it semantically selects 
+specific model variants based on context (e.g., "OfficeChair" when user 
+mentions "desk", "Recliner" when user mentions "relaxing").
+
+Target Platform: Meta Quest 3 (standalone VR headset)
+Development Platform: Unity Editor on Windows PC
+
+================================================================================
+2. HISTORICAL DEVELOPMENT & DESIGN DECISIONS
+================================================================================
+
+The system evolved through several iterations, each addressing specific 
+limitations discovered during development and testing.
+
+------------------------------------------------------------------------------
+2.1 PHASE 1: Hardcoded Prefabs (Initial Prototype)
+------------------------------------------------------------------------------
+Original Implementation:
+- Unity prefabs assigned in Inspector to keyword mappings
+- Simple string matching: "chair" → spawn Chair prefab
+- Limited to ~10 pre-imported models
+
+Limitation Discovered:
+- Scaling poorly: Adding new models required reimporting into Unity
+- No variety: Only one "chair" model available
+- Build size: Each prefab increased APK size
+
+Decision Made: Move to runtime GLB loading
+
+------------------------------------------------------------------------------
+2.2 PHASE 2: ShapeNet Folder Structure
+------------------------------------------------------------------------------
+Original Implementation:
+- ShapeNet organized by category folders: /Chair/model1.glb, /Table/model2.glb
+- Unity traversed folder structure at runtime
+- Keyword matched to folder name
+
+Limitation Discovered:
+- Folder structure inconsistent across categories
+- Subcategories (OfficeChair, Recliner) lost in flat structure
+- Quest 3 cannot access PC file system
+
+Decision Made: Create flat GLB folder + inventory.csv metadata
+
+------------------------------------------------------------------------------
+2.3 PHASE 3: Inventory CSV + Random Selection
+------------------------------------------------------------------------------
+Implementation:
+- Single GLB folder: 2,786 models with unique IDs
+- inventory.csv: Maps ID → categories (e.g., "abc123,Chair,OfficeChair")
+- Unity parsed CSV, matched keywords, randomly selected from matches
+
+Limitation Discovered:
+- "Put a chair in front of my desk" might spawn a recliner
+- Random selection ignored contextual appropriateness
+- User had no control over model variants
+
+Decision Made: Let LLM select specific model based on context
+
+------------------------------------------------------------------------------
+2.4 PHASE 4: LLM-Driven Model Selection (Current)
+------------------------------------------------------------------------------
+Current Implementation:
+- Flask loads inventory.csv at startup
+- Each request sends relevant inventory subset to Claude
+- Claude analyzes context and selects specific modelId
+- Unity receives modelId directly, no random selection
+
+Why This Works:
+- "chair for desk" → Claude sees OfficeChair variants → selects one
+- "something to relax on" → Claude sees Recliner variants → selects one
+- Full semantic understanding, not just keyword matching
+
+------------------------------------------------------------------------------
+2.5 PHASE 5: Platform-Specific Loading
+------------------------------------------------------------------------------
+Problem Discovered:
+- Quest 3 (Android) cannot access C:\Users\... paths
+- PC development needs fast local file access
+
+Solution Implemented:
+- Platform detection: Application.platform == RuntimePlatform.Android
+- PC: Loads GLB from local file system
+- Quest: Downloads GLB via HTTP from Flask server
+
+------------------------------------------------------------------------------
+2.6 PHASE 6: Automatic Orientation Correction
+------------------------------------------------------------------------------
+Problem Discovered:
+- ShapeNet models have inconsistent orientations
+- Some chairs spawn on their side, tables upside down
+- Bounding box analysis failed for wide furniture (couches)
+
+Solution Implemented: Bottom Mass Analysis Algorithm
+- Collect all mesh vertices
+- Calculate center of mass
+- For each axis, sum "bottom mass" (vertices below center)
+- Axis with most bottom mass = natural "down" direction
+- Rotate model to align that axis with Unity's -Y
+
+Why Bottom Mass Works:
+- Chairs: Legs have dense vertex clusters → detected as bottom
+- Tables: Legs at bottom → detected correctly
+- Couches: Base at bottom → works despite wide bounding box
+- Beds: Frame at bottom → detected correctly
+
+------------------------------------------------------------------------------
+2.7 PHASE 7: Spawn Height from Bounding Box
+------------------------------------------------------------------------------
+Problem Discovered:
+- Fixed 0.15m spawn height caused objects to float or clip
+- Small objects floated, large objects intersected floor
+
+Solution Implemented:
+- Calculate actual bounds.min.y after orientation correction
+- Lift object by exact amount to place bottom at spawn point
+- Dynamic per-model adjustment
+
+================================================================================
+3. CURRENT ARCHITECTURE
+================================================================================
+
++------------------+      Voice      +-------------------+
+|                  |   Commands      |                   |
+|   Meta Quest 3   |---------------->|   Unity XR App    |
+|   (VR Headset)   |                 |  (VoiceObject     |
+|                  |<----------------|    Spawner)       |
++------------------+   Rendered 3D   +-------------------+
+                                              |
+                                              | HTTP POST
+                                              | /api/process_command
+                                              v
+                      +------------------------------------------+
+                      |                                          |
+                      |           Flask Python Server            |
+                      |           (llm_server.py)                |
+                      |                                          |
+                      |  +------------------------------------+  |
+                      |  |  Inventory Database (in-memory)    |  |
+                      |  |  2,786 models organized by         |  |
+                      |  |  category from inventory.csv       |  |
+                      |  +------------------------------------+  |
+                      |                    |                     |
+                      +------------------------------------------+
+                                           |
+                                           | Anthropic API
+                                           | (Tool Calling)
+                                           v
+                      +------------------------------------------+
+                      |                                          |
+                      |         Claude AI (claude-sonnet-4-0)       |
+                      |                                          |
+                      |  Receives: Voice command + Inventory     |
+                      |  Returns:  Tool call with modelId        |
+                      |                                          |
+                      +------------------------------------------+
+
+                      Data Returns:
+                      
+                      Claude → Flask: Tool call with modelId
+                      Flask → Unity: JSON {action, objectName, modelId, color}
+                      
+                      Model Loading (Quest):
+                      
+                      Unity ----HTTP GET /glb/{modelId}----> Flask
+                      Flask ----Binary GLB file------------> Unity
+                      
+                      Model Loading (PC):
+                      
+                      Unity ----File.Read()---> C:\ShapenetData\GLB\{modelId}.glb
+
+
+================================================================================
+4. COMPONENT DETAILS
+================================================================================
+
+------------------------------------------------------------------------------
+4.1 UNITY VR APPLICATION
+------------------------------------------------------------------------------
+Platform: Unity 2022.3 LTS with XR Interaction Toolkit
+Target: Meta Quest 3 (Android), Windows PC (development)
+
+Key Scripts:
+
+VoiceObjectSpawner.cs (1,193 lines)
+  Purpose: Central controller for voice commands and object spawning
+  
+  Responsibilities:
+  - Subscribes to DictationManager for speech transcription
+  - Caches spawn point when user finishes speaking (before LLM delay)
+  - Sends commands to PythonServerClient
+  - Processes LLMResponse and triggers model loading
+  - Manages object naming (Chair_1_Brown, Table_2, etc.)
+  - Tracks object metadata for future modifications
+  
+  Key Methods:
+  - ProcessVoiceCommand(string command)
+  - ProcessVoiceCommandWithPython(string command)
+  - SpawnGLBAtRaycastWithColor(glbPath, objectName, modelId, color)
+  - GenerateUniqueName(objectType, colorName)
+  - ApplyColorToObject(obj, color)
+
+PythonServerClient.cs (241 lines)
+  Purpose: HTTP communication with Flask server
+  
+  Responsibilities:
+  - Singleton pattern for global access
+  - Serializes VoiceCommandRequest to JSON
+  - Sends POST requests to /api/process_command
+  - Deserializes LLMResponse from JSON
+  - Handles timeout and error callbacks
+  
+  Key Properties:
+  - ServerUrl: Configurable endpoint (default: http://localhost:5000)
+  - Timeout: 10 seconds per request
+
+RuntimeModelLoader.cs (832 lines)
+  Purpose: GLB file loading, physics setup, orientation correction
+  
+  Responsibilities:
+  - Platform detection (PC vs Quest)
+  - Local file loading via GLTFast
+  - HTTP loading via UnityWebRequest + GLTFast
+  - Bounding box calculation from mesh vertices
+  - Automatic orientation correction (bottom mass algorithm)
+  - Collider and Rigidbody setup
+  - XRGrabInteractable configuration
+  
+  Key Methods:
+  - LoadModel(glbPath, modelId, position, rotation)
+  - LoadAndSpawnModel(glbFilePath, position, rotation)
+  - LoadModelFromURL(url, position, rotation)
+  - CorrectModelOrientation(modelContainer, bounds)
+  - CalculateCombinedBounds(modelContainer)
+
+InventoryCSVReader.cs (203 lines)
+  Purpose: Parse inventory.csv into VoiceObjectMapping entries
+  
+  Responsibilities:
+  - Read CSV with quoted field handling
+  - Parse category strings (e.g., "Chair,Recliner")
+  - Verify GLB files exist on disk
+  - Create keyword lists from all categories
+  
+  CSV Format: fullId,category
+  Example: 100f39dce7690f59efb94709f30ce0d2,"Chair,Recliner"
+
+DictationManager.cs (Meta SDK)
+  Purpose: Speech-to-text via Quest 3's built-in recognition
+  
+  Events:
+  - OnPartialTranscript: Real-time feedback while speaking
+  - OnFinalTranscript: Complete transcription when speech ends
+
+------------------------------------------------------------------------------
+4.2 FLASK PYTHON SERVER
+------------------------------------------------------------------------------
+File: flask_server/llm_server.py (388 lines)
+Framework: Flask with CORS enabled
+Host: 0.0.0.0:5000 (accessible on local network)
+
+Responsibilities:
+- Load inventory.csv at startup into memory dictionary
+- Receive voice commands from Unity
+- Construct inventory context for Claude
+- Call Anthropic API with tool definitions
+- Parse tool call response and extract modelId
+- Serve GLB files to Quest over HTTP
+- Serve inventory.csv to Quest on startup
+
+Endpoints:
+
+  GET /ping
+    Purpose: Health check
+    Response: {"status": "ok", "message": "..."}
+
+  POST /api/process_command
+    Purpose: Process voice commands through LLM
+    Request Body: {"command": "put a blue chair", "timestamp": "..."}
+    Response: {"action": "spawn", "objectName": "chair", "modelId": "abc123", "color": "blue"}
+    
+    Processing Steps:
+    1. Extract command from request JSON
+    2. Build inventory context (first 10 categories, 15 models each)
+    3. Call Claude with system prompt + tools + command
+    4. If tool_use response: Extract tool name and arguments
+    5. Convert spawn_furniture → spawn, delete_furniture → delete
+    6. Return JSON to Unity
+
+  GET /glb/<glb_id>
+    Purpose: Serve GLB files to Quest over HTTP
+    Response: Binary GLB file with mimetype 'model/gltf-binary'
+    
+    Why Needed:
+    - Quest cannot access PC file system
+    - GLTFast can load from HTTP URL
+    - Avoids bundling 2,786 models in APK
+
+  GET /inventory.csv
+    Purpose: Serve inventory CSV to Quest on startup
+    Response: Raw CSV text file
+    
+    Why Needed:
+    - Quest downloads CSV on app start
+    - Enables fallback local matching if LLM fails
+
+Inventory Data Structure:
+  INVENTORY = {
+    "chair": [
+      {"id": "abc123", "categories": "Chair,OfficeChair"},
+      {"id": "def456", "categories": "Chair,Recliner"},
+      ...
+    ],
+    "table": [...],
+    ...
+  }
+
+------------------------------------------------------------------------------
+4.3 CLAUDE AI INTEGRATION
+------------------------------------------------------------------------------
+Model: claude-sonnet-4-0 (via Anthropic API)
+Method: Native Tool Calling (not prompt engineering)
+
+Why Claude Over Local LLM:
+- Tool calling: Structured output guaranteed
+- Context understanding: "chair for desk" → OfficeChair
+- Inventory reasoning: Can compare variants and select best match
+- Reliability: Consistent JSON format, no parsing failures
+
+Tool Definitions Provided to Claude:
+
+  spawn_furniture:
+    Required Parameters:
+      - objectName: enum ["chair", "table", "sofa", ...]
+      - modelId: string (specific ID from inventory)
+    Optional Parameters:
+      - color: enum ["red", "blue", ...]
+      - quantity: integer (default 1)
+    
+  delete_furniture:
+    Parameters: None (deletes whatever user is pointing at)
+    
+  modify_furniture:
+    Optional Parameters:
+      - color: enum for recoloring
+      - variation: boolean for different model
+
+System Prompt Strategy:
+  "You are a VR furniture placement assistant. Choose the most 
+   contextually appropriate model ID based on user intent.
+   
+   Available Models:
+   CHAIR:
+     - ID: abc123, Types: Chair,OfficeChair
+     - ID: def456, Types: Chair,Recliner
+     ..."
+
+How Claude Selects Models:
+  1. Receives user command: "put a chair in front of my desk"
+  2. Sees inventory with OfficeChair, Recliner, DiningChair variants
+  3. Infers "desk" context → office environment
+  4. Selects an OfficeChair variant's ID
+  5. Returns tool call: spawn_furniture(objectName="chair", modelId="...")
+
+Token Usage:
+  - Inventory context: ~800 tokens (limited to prevent overflow)
+  - Tool definitions: ~400 tokens
+  - User command: ~20 tokens
+  - Response: ~100 tokens
+  - Total per request: ~1,300 tokens
+
+------------------------------------------------------------------------------
+4.4 3D MODEL DATABASE (SHAPENET)
+------------------------------------------------------------------------------
+Source: ShapeNet dataset (research 3D model collection)
+Location: C:\Users\s2733099\ShapenetData\
+
+Structure:
+  ShapenetData/
+  ├── inventory.csv        (2,786 entries, ~150KB)
+  └── GLB/                  (2,786 .glb files, ~5GB total)
+      ├── 100f39dce7690f59efb94709f30ce0d2.glb
+      ├── 6625567b0c22800524dc97938ca5e893.glb
+      └── ...
+
+inventory.csv Format:
+  fullId,category
+  100f39dce7690f59efb94709f30ce0d2,"Chair,Recliner"
+  6625567b0c22800524dc97938ca5e893,"Chair,OfficeChair"
+  a1b2c3d4e5f6...,"Table,DiningTable"
+
+Categories Present:
+  - Chair (multiple subcategories: OfficeChair, Recliner, DiningChair)
+  - Table (DiningTable, CoffeeTable, Desk)
+  - Sofa, Couch, Lamp, Bed, Shelf, Bench, Stool
+  - And many more...
+
+Model Format: GLB (Binary glTF)
+  - Self-contained: Geometry + materials + textures in one file
+  - Web-compatible: GLTFast library loads efficiently
+  - Compressed: Smaller than OBJ/FBX equivalents
+
+================================================================================
+5. DATA FLOW & COMMUNICATION PROTOCOLS
+================================================================================
+
+------------------------------------------------------------------------------
+5.1 COMPLETE COMMAND FLOW
+------------------------------------------------------------------------------
+
+Step 1: VOICE CAPTURE
+  User: Holds A button and speaks
+  DictationManager: Captures audio, sends to Meta's speech-to-text
+  Result: "Put a blue chair in front of my desk"
+
+Step 2: SPAWN POINT CACHING
+  When: Immediately when user releases A button (before LLM processing)
+  Why: User looks at target location while speaking, may look away during LLM delay
+  Data: Vector3 position + Quaternion rotation from raycast hit
+
+Step 3: HTTP REQUEST TO FLASK
+  From: Unity (PythonServerClient.cs)
+  To: Flask server at http://192.168.178.74:5000/api/process_command
+  Method: POST
+  Headers: Content-Type: application/json
+  Body: {"command": "Put a blue chair in front of my desk", "timestamp": "..."}
+
+Step 4: FLASK PROCESSES REQUEST
+  4a. Parse incoming JSON
+  4b. Build inventory context string (first 150 models)
+  4c. Construct Claude API request with tools
+
+Step 5: CLAUDE API CALL
+  From: Flask server
+  To: api.anthropic.com
+  Method: POST (Anthropic Python SDK)
+  
+  Request includes:
+  - System prompt with inventory
+  - Tool definitions (spawn/delete/modify)
+  - User message (the voice command)
+
+Step 6: CLAUDE RETURNS TOOL CALL
+  Response:
+  {
+    "stop_reason": "tool_use",
+    "content": [{
+      "type": "tool_use",
+      "name": "spawn_furniture",
+      "input": {
+        "objectName": "chair",
+        "modelId": "6625567b0c22800524dc97938ca5e893",
+        "color": "blue"
+      }
+    }]
+  }
+
+Step 7: FLASK RETURNS TO UNITY
+  Response to Unity:
+  {
+    "action": "spawn",
+    "objectName": "chair",
+    "modelId": "6625567b0c22800524dc97938ca5e893",
+    "color": "blue",
+    "quantity": 1,
+    "scale": 1.0
+  }
+
+Step 8: UNITY PROCESSES RESPONSE
+  8a. Parse LLMResponse JSON
+  8b. Check action type (spawn/delete/modify)
+  8c. Construct GLB path or URL based on platform
+  8d. Call RuntimeModelLoader.LoadModel()
+
+Step 9: MODEL LOADING (Platform-Specific)
+
+  IF PC (Windows):
+    Path: C:\Users\s2733099\ShapenetData\GLB\6625567b0c22800524dc97938ca5e893.glb
+    Method: File.Exists() check, then GLTFast.Load(path)
+    
+  IF QUEST (Android):
+    URL: http://192.168.178.74:5000/glb/6625567b0c22800524dc97938ca5e893
+    Method: HTTP GET, then GLTFast.Load(url)
+    
+    Flask receives: GET /glb/6625567b0c22800524dc97938ca5e893
+    Flask returns: Binary GLB file (~200KB - 2MB)
+
+Step 10: MODEL POST-PROCESSING
+  10a. Wait for GLTFast to instantiate meshes
+  10b. Apply fallback material (prevent pink flash)
+  10c. Calculate bounding box from mesh vertices
+  10d. Run orientation correction (bottom mass algorithm)
+  10e. Recalculate bounds after rotation
+  10f. Lift object so bottom sits on surface
+  10g. Setup BoxCollider with padding
+  10h. Configure Rigidbody (kinematic during setup)
+  10i. Enable XRGrabInteractable
+  10j. Apply color if specified
+  10k. Generate unique name (Chair_1_Blue)
+  10l. Activate object and enable physics
+
+Step 11: OBJECT APPEARS IN VR
+  - Correctly oriented (legs down)
+  - Sitting on surface (not floating or clipping)
+  - Grabbable with VR controllers
+  - Named in hierarchy (Chair_1_Blue)
+  - Physics-enabled (falls if pushed off edge)
+
+------------------------------------------------------------------------------
+5.2 JSON DATA STRUCTURES
+------------------------------------------------------------------------------
+
+VoiceCommandRequest (Unity → Flask):
+{
+  "command": "put a blue chair",
+  "timestamp": "2025-12-21T14:30:00Z"
+}
+
+LLMResponse (Flask → Unity):
+{
+  "action": "spawn",           // "spawn", "delete", "modify", "query"
+  "objectName": "chair",       // Category name
+  "modelId": "abc123...",      // Specific model ID (NEW: from LLM)
+  "color": "blue",             // Optional: color to apply
+  "quantity": 1,               // Number to spawn
+  "scale": 1.0,                // Scale multiplier
+  "response": "..."            // For "query" action: conversational text
+}
+
+VoiceObjectMapping (Internal Unity):
+{
+  "objectName": "Chair",
+  "glbPath": "C:/Users/.../GLB/abc123.glb",
+  "modelId": "abc123...",
+  "keywords": ["chair", "officechair", "recliner"]
+}
+
+ObjectMetadata (Internal Unity):
+{
+  "objectType": "chair",
+  "instanceNumber": 1,
+  "color": "Blue",
+  "modelId": "abc123..."
+}
+
+================================================================================
+6. NETWORK ARCHITECTURE
+================================================================================
+
+------------------------------------------------------------------------------
+6.1 NETWORK TOPOLOGY
+------------------------------------------------------------------------------
+
++-------------------+        WiFi        +-------------------+
+|   Meta Quest 3    |<------------------>|   WiFi Router     |
+| 192.168.178.25    |                    | 192.168.178.1     |
++-------------------+                    +-------------------+
+                                                  |
+                                                  | Ethernet/WiFi
+                                                  v
+                                         +-------------------+
+                                         |   Development PC  |
+                                         | 192.168.178.74    |
+                                         |                   |
+                                         | Flask: :5000      |
+                                         | Unity Editor      |
+                                         +-------------------+
+                                                  |
+                                                  | HTTPS
+                                                  v
+                                         +-------------------+
+                                         |  Anthropic API    |
+                                         | api.anthropic.com |
+                                         +-------------------+
+
+------------------------------------------------------------------------------
+6.2 PORT CONFIGURATION
+------------------------------------------------------------------------------
+
+Flask Server:
+  - Binds to: 0.0.0.0:5000 (all network interfaces)
+  - Accessible at: http://192.168.178.74:5000
+  - Protocol: HTTP (not HTTPS for local network)
+
+Quest → Flask Communication:
+  - POST /api/process_command (voice commands)
+  - GET /glb/{id} (model downloads)
+  - GET /inventory.csv (startup inventory)
+
+Flask → Anthropic:
+  - HTTPS to api.anthropic.com
+  - Port 443 (standard HTTPS)
+  - API key authentication
+
+------------------------------------------------------------------------------
+6.3 CORS CONFIGURATION
+------------------------------------------------------------------------------
+
+Flask enables CORS for all origins:
+  from flask_cors import CORS
+  CORS(app)
+
+Why Needed:
+  - Unity WebGL would require CORS (not currently used)
+  - Quest native app doesn't require CORS
+  - Enabled for flexibility and future WebGL support
+
+================================================================================
+7. TECHNICAL SPECIFICATIONS
+================================================================================
+
+------------------------------------------------------------------------------
+7.1 PERFORMANCE METRICS
+------------------------------------------------------------------------------
+
+Latency Breakdown:
+  - Speech-to-text: ~500ms (Meta's on-device processing)
+  - Unity → Flask HTTP: ~20ms (local network)
+  - Flask → Claude API: ~2000ms (internet round-trip + inference)
+  - Flask → Unity response: ~20ms
+  - GLB download (Quest): ~500-2000ms (depends on file size)
+  - GLB parsing: ~200ms
+  - Orientation correction: ~50ms
+  - Total: ~3-5 seconds end-to-end
+
+Model Sizes:
+  - Minimum: ~50KB (simple geometry)
+  - Average: ~400KB
+  - Maximum: ~3MB (detailed models)
+  - Total database: ~5GB (2,786 models)
+
+Memory Usage:
+  - Flask inventory dict: ~2MB
+  - Unity loaded models: ~50-200MB (depends on scene complexity)
+  - Per-model instantiated: ~5-30MB
+
+------------------------------------------------------------------------------
+7.2 ORIENTATION CORRECTION ALGORITHM
+------------------------------------------------------------------------------
+
+Purpose: Auto-detect and correct model orientation so "bottom" faces down
+
+Algorithm: Bottom Mass Analysis
+
+  Input: GameObject with loaded mesh data
+  Output: Rotation applied to modelContainer
+
+  Pseudocode:
+  
+  1. Collect all vertices from all MeshFilters
+  2. Calculate center of mass (average of all vertices)
+  3. For each axis (X, Y, Z):
+       bottomMass[axis] = 0
+       For each vertex:
+         If vertex[axis] < centerOfMass[axis]:
+           bottomMass[axis] += (centerOfMass[axis] - vertex[axis])
+  
+  4. Find axis with maximum bottomMass
+  5. Apply rotation to align that axis with Unity's -Y:
+       If X has max: Rotate 90° around Z
+       If Z has max: Rotate -90° around X
+       If Y has max: No rotation needed
+
+Why This Works:
+  - Furniture has structural mass at bottom (legs, base, frame)
+  - Vertices cluster where there's geometry
+  - The axis with most "below-center" mass = natural bottom
+  - Works for all furniture types regardless of aspect ratio
+
+------------------------------------------------------------------------------
+7.3 SPAWN HEIGHT CALCULATION
+------------------------------------------------------------------------------
+
+Purpose: Place object so bottom touches spawn surface
+
+Algorithm:
+
+  1. After orientation correction, recalculate bounds
+  2. bounds.min.y = lowest point of model (relative to center)
+  3. bottomToCenter = -bounds.min.y (distance from center to bottom)
+  4. rootObject.position += Vector3.up * bottomToCenter
+  
+Result: Object's lowest vertex sits exactly at spawn point
+
+------------------------------------------------------------------------------
+7.4 OBJECT NAMING CONVENTION
+------------------------------------------------------------------------------
+
+Format: {Type}_{InstanceNumber}_{Color}
+
+Examples:
+  - Chair_1_Blue
+  - Table_2 (no color specified)
+  - Sofa_3_Red
+  - Chair_1_Green (after recoloring Chair_1_Blue)
+
+Implementation:
+  - Dictionary<string, int> objectCounters tracks per-type counts
+  - Dictionary<GameObject, ObjectMetadata> stores metadata
+  - ApplyColorToObject() updates name when color changes
+  - ColorToName() converts Unity Color to string via distance matching
+
+================================================================================
+8. FILE REFERENCE
+================================================================================
+
+Unity Project:
+  Assets/Scripts/
+    VoiceObjectSpawner.cs      - Main controller (1,193 lines)
+    RuntimeModelLoader.cs      - GLB loading (832 lines)
+    PythonServerClient.cs      - HTTP client (241 lines)
+    InventoryCSVReader.cs      - CSV parsing (203 lines)
+    DictationManager.cs        - Voice input (Meta SDK)
+
+Flask Server:
+  flask_server/
+    llm_server.py              - Flask + Claude (388 lines)
+
+External Data:
+  C:\Users\s2733099\ShapenetData\
+    inventory.csv              - Model database (2,786 entries)
+    GLB\                       - 3D model files (2,786 .glb files)
+
+Documentation:
+  SYSTEM_ARCHITECTURE_THESIS.txt  - This file
+  ARCHITECTURE_OVERVIEW.md        - Quick reference (created earlier)
+
+================================================================================
+END OF DOCUMENT
+================================================================================
+
+Summary for Thesis:
+
+This prototype demonstrates a novel approach to VR furniture placement where
+natural language understanding (via Claude AI) drives contextual 3D model
+selection from a large database. The system overcomes several technical
+challenges:
+
+1. Cross-platform model loading (PC file system vs. Quest HTTP)
+2. Inconsistent 3D model orientations (solved via bottom mass analysis)
+3. LLM output reliability (solved via native tool calling)
+4. Spawn timing issues (solved via spawn point caching)
+
+The architecture separates concerns effectively:
+- Unity handles VR rendering and interaction
+- Flask handles network communication and API bridging
+- Claude handles semantic understanding and model selection
+- ShapeNet provides diverse 3D content
+
+Future work could explore:
+- Model caching on Quest for faster re-spawning
+- Multi-object spatial reasoning ("put chairs around the table")
+- Persistent scene saving/loading
+- Collaborative multi-user placement

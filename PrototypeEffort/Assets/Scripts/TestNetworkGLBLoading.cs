@@ -131,7 +131,7 @@ public class TestNetworkGLBLoading : MonoBehaviour
     {
         Debug.Log($"<color=yellow>[Network Test] Starting download from Flask server...</color>");
         
-        var loadCoroutine = modelLoader.LoadModelFromURL(url, position, rotation, testCategory);
+        var loadCoroutine = modelLoader.LoadModelFromURL(url, position, rotation);
         yield return loadCoroutine;
 
         Debug.Log($"<color=green>[Network Test] Load completed! Check scene for spawned chair.</color>");

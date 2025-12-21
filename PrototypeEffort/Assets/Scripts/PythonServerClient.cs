@@ -19,6 +19,9 @@ public class PythonServerClient : MonoBehaviour
     [Header("Timeout Settings")]
     [SerializeField] private float requestTimeout = 10f;
     
+    // Public property to access server URL
+    public string ServerUrl => serverUrl;
+    
     // Singleton pattern for easy access
     public static PythonServerClient Instance { get; private set; }
     
@@ -186,6 +189,7 @@ public class LLMResponse
     // OPTION B fields (will be populated when we upgrade)
     public string action;          // "spawn", "delete", "switch_mode", "query"
     public string objectName;      // "chair", "table", etc.
+    public string modelId;         // Specific model ID selected by LLM (NEW!)
     public string assetId;         // ShapeNet ID
     public string assetUrl;        // URL to GLTF file
     public string category;        // Object category

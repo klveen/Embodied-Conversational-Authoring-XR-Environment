@@ -31,12 +31,31 @@ public class VoiceObjectSpawner : MonoBehaviour
     [SerializeField] private bool usePythonServer = false;
     [SerializeField] private PythonServerClient pythonClient;
     
-    [Header("Object Library (Local Fallback)")]
+    [Header("Inventory Data")]
+    [Tooltip("Path to inventory.csv (e.g., C:/Users/s2733099/ShapenetData/inventory.csv)")]
+    [SerializeField] private string inventoryCSVPath = "C:/Users/s2733099/ShapenetData/inventory.csv";
+    
+    [Tooltip("Path to GLB folder (e.g., C:/Users/s2733099/ShapenetData/GLB)")]
+    [SerializeField] private string glbFolderPath = "C:/Users/s2733099/ShapenetData/GLB";
+    
+    [Header("Object Library")]
     [SerializeField] private List<VoiceObjectMapping> objectMappings = new List<VoiceObjectMapping>();
     
     [Header("Runtime GLB Loading")]
     [Tooltip("Reference to RuntimeModelLoader for loading .glb files at runtime")]
     [SerializeField] private RuntimeModelLoader runtimeModelLoader;
+    
+    // Object naming system
+    private Dictionary<string, int> objectCounters = new Dictionary<string, int>();
+    private Dictionary<GameObject, ObjectMetadata> objectMetadata = new Dictionary<GameObject, ObjectMetadata>();
+    
+    private class ObjectMetadata
+    {
+        public string objectType;    // "Chair", "Table", etc.
+        public int instanceNumber;   // 1, 2, 3...
+        public string color;         // "Brown", "Red", "Blue", null
+        public string modelId;       // Original model ID
+    }
     
     private void Start()
     {
@@ -46,11 +65,67 @@ public class VoiceObjectSpawner : MonoBehaviour
             dictationManager.OnFinalTranscript.AddListener(ProcessVoiceCommand);
         }
         
+        // Load inventory from CSV
+        LoadInventoryFromCSV();
+        
         // Set initial welcome message
         if (llmResponseText != null)
         {
             llmResponseText.text = "I will be your personal design companion, please hold A in order to talk to me. Try saying something like: \"place a pink chair\", and I can help you!";
         }
+    }
+    
+    /// <summary>
+    /// Loads inventory.csv and populates objectMappings
+    /// </summary>
+    private async void LoadInventoryFromCSV()
+    {
+        string csvPath = inventoryCSVPath;
+        
+        // On Quest, download CSV from Flask server
+        if (Application.platform == RuntimePlatform.Android)
+        {
+            csvPath = System.IO.Path.Combine(Application.temporaryCachePath, "inventory.csv");
+            string csvURL = $"{pythonClient.ServerUrl}/inventory.csv";
+            
+            Debug.Log($"[VoiceObjectSpawner] Quest detected - downloading CSV from: {csvURL}");
+            
+            using (UnityEngine.Networking.UnityWebRequest www = UnityEngine.Networking.UnityWebRequest.Get(csvURL))
+            {
+                var operation = www.SendWebRequest();
+                
+                // Wait for completion
+                while (!operation.isDone)
+                {
+                    await System.Threading.Tasks.Task.Yield();
+                }
+                
+                if (www.result != UnityEngine.Networking.UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"[VoiceObjectSpawner] Failed to download CSV: {www.error}");
+                    return;
+                }
+                
+                System.IO.File.WriteAllText(csvPath, www.downloadHandler.text);
+                Debug.Log($"[VoiceObjectSpawner] Downloaded CSV to: {csvPath}");
+            }
+        }
+        
+        Debug.Log($"[VoiceObjectSpawner] Loading inventory from: {csvPath}");
+        
+        // Read inventory entries
+        List<InventoryCSVReader.InventoryEntry> entries = InventoryCSVReader.ReadInventoryCSV(csvPath);
+        
+        if (entries.Count == 0)
+        {
+            Debug.LogError("[VoiceObjectSpawner] No inventory entries loaded!");
+            return;
+        }
+        
+        // Convert to mappings
+        objectMappings = InventoryCSVReader.ConvertToMappings(entries, glbFolderPath);
+        
+        Debug.Log($"[VoiceObjectSpawner] Loaded {objectMappings.Count} object mappings from inventory");
     }
     
     private void Update()
@@ -138,25 +213,43 @@ public class VoiceObjectSpawner : MonoBehaviour
                         spawnColor = ParseColor(response.color);
                     }
                     
-                    // Find matching object and spawn with color
-                    List<VoiceObjectMapping> matches = FindAllMatchingMappings(response.objectName);
-                    if (matches.Count > 0)
+                    // LLM provides the specific modelId - use it directly!
+                    if (!string.IsNullOrEmpty(response.modelId))
                     {
-                        VoiceObjectMapping selected = matches[Random.Range(0, matches.Count)];
+                        // Construct glbPath for PC (Quest uses modelId directly)
+                        string glbPath = System.IO.Path.Combine(glbFolderPath, response.modelId + ".glb");
                         
-                        if (!string.IsNullOrEmpty(selected.glbPath) && runtimeModelLoader != null)
+                        Debug.Log($"[VoiceObjectSpawner] LLM selected model: name='{response.objectName}', modelId='{response.modelId}'");
+                        
+                        if (runtimeModelLoader != null)
                         {
-                            await SpawnGLBAtRaycastWithColor(selected.glbPath, selected.objectName, spawnColor);
-                        }
-                        else if (selected.prefab != null)
-                        {
-                            SpawnObjectAtRaycastWithColor(selected.prefab, selected.objectName, spawnColor);
+                            await SpawnGLBAtRaycastWithColor(glbPath, response.objectName, response.modelId, spawnColor);
                         }
                     }
                     else
                     {
-                        Debug.LogWarning($"No matching object found for '{response.objectName}'");
-                        UpdateLLMResponseText($"I don't have a {response.objectName} available.");
+                        // Fallback: Find matching object randomly (old behavior)
+                        List<VoiceObjectMapping> matches = FindAllMatchingMappings(response.objectName);
+                        if (matches.Count > 0)
+                        {
+                            VoiceObjectMapping selected = matches[Random.Range(0, matches.Count)];
+                            
+                            Debug.Log($"[VoiceObjectSpawner] Fallback - Selected mapping: name='{selected.objectName}', glbPath='{selected.glbPath}', modelId='{selected.modelId}' (length={selected.modelId?.Length ?? 0})");
+                            
+                            if (!string.IsNullOrEmpty(selected.glbPath) && runtimeModelLoader != null)
+                            {
+                                await SpawnGLBAtRaycastWithColor(selected.glbPath, selected.objectName, selected.modelId, spawnColor);
+                            }
+                            else if (selected.prefab != null)
+                            {
+                                SpawnObjectAtRaycastWithColor(selected.prefab, selected.objectName, spawnColor);
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"No matching object found for '{response.objectName}'");
+                            UpdateLLMResponseText($"I don't have a {response.objectName} available.");
+                        }
                     }
                 }
                 else if (response.action == "delete")
@@ -293,7 +386,7 @@ public class VoiceObjectSpawner : MonoBehaviour
             if (!string.IsNullOrEmpty(selectedMapping.glbPath) && runtimeModelLoader != null)
             {
                 // Load GLB at runtime
-                await SpawnGLBAtRaycast(selectedMapping.glbPath, selectedMapping.objectName);
+                await SpawnGLBAtRaycast(selectedMapping.glbPath, selectedMapping.objectName, selectedMapping.modelId);
             }
             else if (selectedMapping.prefab != null)
             {
@@ -331,7 +424,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         return matches;
     }
     
-    private async System.Threading.Tasks.Task SpawnGLBAtRaycast(string glbPath, string objectName)
+    private async System.Threading.Tasks.Task SpawnGLBAtRaycast(string glbPath, string objectName, string modelId)
     {
         if (runtimeModelLoader == null)
         {
@@ -355,34 +448,23 @@ public class VoiceObjectSpawner : MonoBehaviour
             Vector3 spawnPosition = hit.point + hit.normal * runtimeModelLoader.spawnHeightOffset;
             Quaternion spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
             
-            Debug.Log($"Loading GLB model from: {glbPath}");
+            Debug.Log($"Loading GLB model: {objectName}");
             
-            // Parse category and filename from path (e.g., "bed/model.glb")
-            string[] pathParts = glbPath.Split('/');
-            if (pathParts.Length >= 2)
+            // Use LoadModel which auto-detects PC vs Quest
+            GameObject spawnedObject = await runtimeModelLoader.LoadModel(
+                glbPath,
+                modelId,
+                spawnPosition,
+                spawnRotation
+            );
+            
+            if (spawnedObject != null)
             {
-                string category = pathParts[0];
-                string fileName = pathParts[1];
-                
-                GameObject spawnedObject = await runtimeModelLoader.LoadShapeNetModel(
-                    category,
-                    fileName,
-                    spawnPosition,
-                    spawnRotation
-                );
-                
-                if (spawnedObject != null)
-                {
-                    Debug.Log($"Successfully spawned GLB model '{objectName}' at {spawnPosition}");
-                }
-                else
-                {
-                    Debug.LogError($"Failed to spawn GLB model from: {glbPath}");
-                }
+                Debug.Log($"Successfully spawned GLB model '{objectName}' at {spawnPosition}");
             }
             else
             {
-                Debug.LogError($"Invalid GLB path format: {glbPath}. Expected format: 'category/filename.glb'");
+                Debug.LogError($"Failed to spawn GLB model from: {glbPath}");
             }
         }
         else
@@ -455,7 +537,7 @@ public class VoiceObjectSpawner : MonoBehaviour
     }
     
     // Async version for GLB spawning with color
-    private async System.Threading.Tasks.Task SpawnGLBAtRaycastWithColor(string glbPath, string objectName, Color? color)
+    private async System.Threading.Tasks.Task SpawnGLBAtRaycastWithColor(string glbPath, string objectName, string modelId, Color? color)
     {
         if (runtimeModelLoader == null)
         {
@@ -487,7 +569,8 @@ public class VoiceObjectSpawner : MonoBehaviour
             
             if (activeRayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
             {
-                spawnPosition = hit.point + hit.normal * runtimeModelLoader.spawnHeightOffset;
+                // Don't add height offset here - RuntimeModelLoader will adjust based on bounding box
+                spawnPosition = hit.point;
                 spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
             }
             else
@@ -498,32 +581,42 @@ public class VoiceObjectSpawner : MonoBehaviour
             }
         }
         
-        string[] pathParts = glbPath.Split('/');
-        if (pathParts.Length >= 2)
-        {
-            string category = pathParts[0];
-            string fileName = pathParts[1];
+        // Find the mapping to get modelId - no longer needed, passed as parameter
+        
+        // Load GLB using platform-aware method
+        GameObject spawnedObject = await runtimeModelLoader.LoadModel(
+            glbPath,
+            modelId,
+            spawnPosition,
+            spawnRotation
+        );
             
-            GameObject spawnedObject = await runtimeModelLoader.LoadShapeNetModel(
-                category,
-                fileName,
-                spawnPosition,
-                spawnRotation
-            );
-                
-            if (spawnedObject != null)
+        if (spawnedObject != null)
+        {
+            // Tag for highlighting system
+            spawnedObject.tag = "SpawnedObject";
+            
+            // Generate unique name and track metadata
+            string colorName = color.HasValue ? ColorToName(color.Value) : null;
+            string uniqueName = GenerateUniqueName(objectName, colorName);
+            spawnedObject.name = uniqueName;
+            
+            // Store metadata for future updates
+            objectMetadata[spawnedObject] = new ObjectMetadata
             {
-                // Tag for highlighting system
-                spawnedObject.tag = "SpawnedObject";
-                
-                // Apply color only if specified by LLM
-                if (color.HasValue)
-                {
-                    ApplyColorToObject(spawnedObject, color.Value);
-                }
-                
-                Debug.Log($"Spawned GLB '{objectName}'" + (color.HasValue ? $" with color {color.Value}" : ""));
+                objectType = objectName,
+                instanceNumber = objectCounters.ContainsKey(objectName) ? objectCounters[objectName] : 1,
+                color = colorName,
+                modelId = modelId
+            };
+            
+            // Apply color only if specified by LLM
+            if (color.HasValue)
+            {
+                ApplyColorToObject(spawnedObject, color.Value);
             }
+            
+            Debug.Log($"Spawned GLB '{uniqueName}'" + (color.HasValue ? $" with color {color.Value}" : ""));
         }
         
         // Clear the cached spawn point after use
@@ -536,25 +629,97 @@ public class VoiceObjectSpawner : MonoBehaviour
         Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
         foreach (Renderer renderer in renderers)
         {
-            // Skip the bounding box renderer (don't color it)
-            if (renderer.gameObject.name == "HighlightBoundingBox")
-            {
-                continue;
-            }
-            
             foreach (Material mat in renderer.materials)
             {
                 mat.color = color;
             }
         }
         
-        // Tell PlaneCollisionDetector to update its stored materials
-        // so it won't override our color when restoring after collision
-        PlaneCollisionDetector collisionDetector = obj.GetComponent<PlaneCollisionDetector>();
-        if (collisionDetector != null)
+        // Update object name if metadata exists
+        if (objectMetadata.ContainsKey(obj))
         {
-            collisionDetector.UpdateStoredMaterials();
+            ObjectMetadata meta = objectMetadata[obj];
+            meta.color = ColorToName(color);
+            obj.name = GenerateNameFromMetadata(meta);
         }
+    }
+    
+    /// <summary>
+    /// Generates a unique name for spawned objects: "Chair_1_Brown" or "Table_2" (no color)
+    /// </summary>
+    private string GenerateUniqueName(string objectType, string colorName)
+    {
+        // Capitalize first letter
+        string capitalizedType = char.ToUpper(objectType[0]) + objectType.Substring(1);
+        
+        // Increment counter
+        if (!objectCounters.ContainsKey(objectType))
+        {
+            objectCounters[objectType] = 0;
+        }
+        objectCounters[objectType]++;
+        
+        int instanceNum = objectCounters[objectType];
+        
+        // Format: Chair_1_Brown or Chair_1 (if no color)
+        if (!string.IsNullOrEmpty(colorName))
+        {
+            return $"{capitalizedType}_{instanceNum}_{colorName}";
+        }
+        else
+        {
+            return $"{capitalizedType}_{instanceNum}";
+        }
+    }
+    
+    /// <summary>
+    /// Generates name from metadata (for updates)
+    /// </summary>
+    private string GenerateNameFromMetadata(ObjectMetadata meta)
+    {
+        string capitalizedType = char.ToUpper(meta.objectType[0]) + meta.objectType.Substring(1);
+        
+        if (!string.IsNullOrEmpty(meta.color))
+        {
+            return $"{capitalizedType}_{meta.instanceNumber}_{meta.color}";
+        }
+        else
+        {
+            return $"{capitalizedType}_{meta.instanceNumber}";
+        }
+    }
+    
+    /// <summary>
+    /// Converts Unity Color to readable name
+    /// </summary>
+    private string ColorToName(Color color)
+    {
+        // Check common colors with tolerance
+        if (ColorDistance(color, Color.red) < 0.3f) return "Red";
+        if (ColorDistance(color, Color.blue) < 0.3f) return "Blue";
+        if (ColorDistance(color, Color.green) < 0.3f) return "Green";
+        if (ColorDistance(color, Color.yellow) < 0.3f) return "Yellow";
+        if (ColorDistance(color, Color.white) < 0.3f) return "White";
+        if (ColorDistance(color, Color.black) < 0.3f) return "Black";
+        if (ColorDistance(color, new Color(0.65f, 0.16f, 0.16f)) < 0.3f) return "Brown";
+        if (ColorDistance(color, new Color(1f, 0.65f, 0f)) < 0.3f) return "Orange";
+        if (ColorDistance(color, new Color(0.5f, 0f, 0.5f)) < 0.3f) return "Purple";
+        if (ColorDistance(color, new Color(1f, 0.75f, 0.8f)) < 0.3f) return "Pink";
+        if (ColorDistance(color, Color.gray) < 0.3f) return "Gray";
+        
+        return "Colored"; // Fallback for unknown colors
+    }
+    
+    /// <summary>
+    /// Calculate distance between two colors
+    /// </summary>
+    private float ColorDistance(Color a, Color b)
+    {
+        return Mathf.Sqrt(
+            Mathf.Pow(a.r - b.r, 2) +
+            Mathf.Pow(a.g - b.g, 2) +
+            Mathf.Pow(a.b - b.b, 2)
+        );
     }
     
     // Legacy method without color (for local keyword matching)
@@ -1016,8 +1181,11 @@ public class VoiceObjectMapping
     [Tooltip("Pre-imported prefab (optional - leave empty if using GLB path)")]
     public GameObject prefab;
     
-    [Tooltip("Path to GLB file (optional - e.g., 'bed/model.glb' relative to shapenet_data folder)")]
+    [Tooltip("Path to GLB file (PC) or ID (Quest) - e.g., full path or just ID")]
     public string glbPath;
+    
+    [Tooltip("Model ID for network loading (Quest only)")]
+    public string modelId;
     
     [Tooltip("Keywords that trigger spawning this object")]
     public List<string> keywords = new List<string>();

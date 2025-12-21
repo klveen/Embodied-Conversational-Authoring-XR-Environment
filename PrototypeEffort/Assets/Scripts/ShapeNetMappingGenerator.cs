@@ -3,9 +3,11 @@ using System.IO;
 using UnityEngine;
 
 /// <summary>
-/// Automatically generates VoiceObjectMapping entries from ShapeNet GLB files.
-/// Scans the shapenet_data folder and creates mappings based on folder structure.
+/// OBSOLETE: This class is no longer used.
+/// The system now uses inventory.csv and loads GLB files directly from C:/Users/s2733099/ShapenetData/GLB/
+/// See InventoryCSVReader for the new approach.
 /// </summary>
+[System.Obsolete("Use InventoryCSVReader and VoiceObjectSpawner's LoadInventoryFromCSV instead")]
 public class ShapeNetMappingGenerator : MonoBehaviour
 {
     [Header("ShapeNet Data Path")]
