@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 public class PythonServerClient : MonoBehaviour
 {
     [Header("Server Configuration")]
-    [SerializeField] private string serverUrl = "http://localhost:5000";
+    [SerializeField] private string serverUrl = "http://192.168.178.74:5000";
     
     [Header("API Endpoints")]
     [SerializeField] private string llmEndpoint = "/api/process_command";

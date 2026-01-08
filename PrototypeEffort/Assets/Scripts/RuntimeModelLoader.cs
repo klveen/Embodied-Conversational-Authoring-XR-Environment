@@ -327,12 +327,12 @@ public class RuntimeModelLoader : MonoBehaviour
             rootObject.AddComponent<BoxCollider>();
         }
         
-        // Add FloorSnapper to automatically snap to floor on release
-        FloorSnapper floorSnapper = rootObject.GetComponent<FloorSnapper>();
-        if (floorSnapper == null)
-        {
-            floorSnapper = rootObject.AddComponent<FloorSnapper>();
-        }
+        // DISABLED: Add FloorSnapper to automatically snap to floor on release
+        // FloorSnapper floorSnapper = rootObject.GetComponent<FloorSnapper>();
+        // if (floorSnapper == null)
+        // {
+        //     floorSnapper = rootObject.AddComponent<FloorSnapper>();
+        // }
         
         // Add PlaneCollisionDetector for visual feedback and selective collision
         PlaneCollisionDetector collisionDetector = rootObject.GetComponent<PlaneCollisionDetector>();

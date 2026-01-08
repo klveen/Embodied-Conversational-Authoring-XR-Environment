@@ -19154,7 +19154,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 63daa37a28bd64043b3427be5c0eaa9a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  serverUrl: http://192.168.1.151:5000
+  serverUrl: http://192.168.178.74:5000
   llmEndpoint: /api/process_command
   healthEndpoint: /ping
   requestTimeout: 10

@@ -297,7 +297,7 @@ DictationManager.cs (Meta SDK)
 ------------------------------------------------------------------------------
 4.2 FLASK PYTHON SERVER
 ------------------------------------------------------------------------------
-File: flask_server/llm_server.py (388 lines)
+File: flask_server/llm_server.py (230 lines)
 Framework: Flask with CORS enabled
 Host: 0.0.0.0:5000 (accessible on local network)
 
