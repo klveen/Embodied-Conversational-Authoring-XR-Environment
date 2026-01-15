@@ -20,29 +20,6 @@ public class ARPlaneColorizerExample : MonoBehaviour
         void Start()
         {
            UpdatePlaneColor();
-           ConfigurePlaneCollision();
-        }
-        
-        void ConfigurePlaneCollision()
-        {
-            // Only floor and wall planes should have physical collision
-            // Tables, ceilings, etc. should be pass-through (trigger only)
-            Collider planeCollider = GetComponent<Collider>();
-            
-            if (planeCollider != null)
-            {
-                if (m_ARPlane.classification == PlaneClassification.Floor ||
-                    m_ARPlane.classification == PlaneClassification.Wall)
-                {
-                    // Floor and wall: solid collision
-                    planeCollider.isTrigger = false;
-                }
-                else
-                {
-                    // Table, ceiling, etc.: pass through but still detect
-                    planeCollider.isTrigger = true;
-                }
-            }
         }
         
         void UpdatePlaneColor()

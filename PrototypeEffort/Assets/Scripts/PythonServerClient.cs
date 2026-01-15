@@ -187,7 +187,7 @@ public class LLMResponse
     public string command;         // Echo of the original command
     
     // OPTION B fields (will be populated when we upgrade)
-    public string action;          // "spawn", "delete", "switch_mode", "query"
+    public string action;          // "spawn", "delete", "scale", "switch_mode", "query"
     public string objectName;      // "chair", "table", etc.
     public string modelId;         // Specific model ID selected by LLM (NEW!)
     public string assetId;         // ShapeNet ID
@@ -197,6 +197,8 @@ public class LLMResponse
     public string interactionMode; // "ray" or "direct"
     public string color;           // "red", "blue", etc.
     public float confidence;       // LLM confidence score
+    public float scaleFactor;      // Scale multiplier for scale action
+    public string relativePosition; // "front", "behind", "left", "right" - for relative spawning
     
     // Optional fields
     public Vector3Data position;

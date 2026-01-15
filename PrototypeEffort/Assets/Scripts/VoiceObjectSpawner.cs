@@ -15,6 +15,10 @@ public class VoiceObjectSpawner : MonoBehaviour
     [SerializeField] private XRRayInteractor rightRayInteractor;
     [SerializeField] private XRRayInteractor leftRayInteractor;
     
+    [Header("Direct Interactor References")]
+    [SerializeField] private XRDirectInteractor rightDirectInteractor;
+    [SerializeField] private XRDirectInteractor leftDirectInteractor;
+    
     [Header("Object Highlighting")]
     [SerializeField] private Material highlightMaterial; // Drag translucent blue material here
     [SerializeField] private float boundingBoxPadding = 0.05f; // Extra space around object
@@ -219,11 +223,11 @@ public class VoiceObjectSpawner : MonoBehaviour
                         // Construct glbPath for PC (Quest uses modelId directly)
                         string glbPath = System.IO.Path.Combine(glbFolderPath, response.modelId + ".glb");
                         
-                        Debug.Log($"[VoiceObjectSpawner] LLM selected model: name='{response.objectName}', modelId='{response.modelId}'");
+                        Debug.Log($"[VoiceObjectSpawner] LLM selected model: name='{response.objectName}', modelId='{response.modelId}', relativePos='{response.relativePosition}'");
                         
                         if (runtimeModelLoader != null)
                         {
-                            await SpawnGLBAtRaycastWithColor(glbPath, response.objectName, response.modelId, spawnColor);
+                            await SpawnGLBAtRaycastWithColor(glbPath, response.objectName, response.modelId, spawnColor, response.relativePosition);
                         }
                     }
                     else
@@ -238,11 +242,11 @@ public class VoiceObjectSpawner : MonoBehaviour
                             
                             if (!string.IsNullOrEmpty(selected.glbPath) && runtimeModelLoader != null)
                             {
-                                await SpawnGLBAtRaycastWithColor(selected.glbPath, selected.objectName, selected.modelId, spawnColor);
+                                await SpawnGLBAtRaycastWithColor(selected.glbPath, selected.objectName, selected.modelId, spawnColor, response.relativePosition);
                             }
                             else if (selected.prefab != null)
                             {
-                                SpawnObjectAtRaycastWithColor(selected.prefab, selected.objectName, spawnColor);
+                                SpawnObjectAtRaycastWithColor(selected.prefab, selected.objectName, spawnColor, response.relativePosition);
                             }
                         }
                         else
@@ -254,8 +258,17 @@ public class VoiceObjectSpawner : MonoBehaviour
                 }
                 else if (response.action == "delete")
                 {
+                    // Debug: Log what we received
+                    Debug.Log($"[Delete] Received - objectName: '{response.objectName}', color: '{response.color}'");
+                    
                     UpdateLLMResponseText("Deleting object...");
-                    DeleteObjectAtRaycast();
+                    DeleteHeldObject(response.objectName, response.color);
+                }
+                else if (response.action == "scale")
+                {
+                    float scaleFactor = response.scaleFactor;
+                    UpdateLLMResponseText($"Scaling object by {scaleFactor}x...");
+                    ScaleHeldObject(scaleFactor);
                 }
                 else if (response.action == "modify")
                 {
@@ -369,7 +382,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         // Check for delete command
         if (command.Contains("delete") || command.Contains("remove"))
         {
-            DeleteObjectAtRaycast();
+            DeleteHeldObject();
             return;
         }
         
@@ -446,7 +459,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         {
             // Spawn slightly above the hit point to prevent clipping through walls
             Vector3 spawnPosition = hit.point + hit.normal * runtimeModelLoader.spawnHeightOffset;
-            Quaternion spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+            Quaternion spawnRotation = Quaternion.identity; // Keep objects upright
             
             Debug.Log($"Loading GLB model: {objectName}");
             
@@ -473,8 +486,8 @@ public class VoiceObjectSpawner : MonoBehaviour
         }
     }
     
-    // New method with color support
-    private void SpawnObjectAtRaycastWithColor(GameObject prefab, string objectName, Color? color)
+    // New method with color support and optional relative positioning
+    private void SpawnObjectAtRaycastWithColor(GameObject prefab, string objectName, Color? color, string relativePosition = null)
     {
         if (prefab == null)
         {
@@ -486,16 +499,34 @@ public class VoiceObjectSpawner : MonoBehaviour
         Vector3 spawnPosition;
         Quaternion spawnRotation;
         
-        // Use cached spawn point if available (captured when dictation ended)
-        if (hasCachedSpawnPoint && cachedSpawnPosition.HasValue && cachedSpawnRotation.HasValue)
+        // PRIORITY 1: Use relative position if specified ("in front of me", etc.)
+        if (!string.IsNullOrEmpty(relativePosition))
+        {
+            // Calculate bounds estimate for distance scaling
+            Bounds bounds = new Bounds(Vector3.zero, Vector3.one * 0.5f); // Default size
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>();
+            if (renderers.Length > 0)
+            {
+                bounds = renderers[0].bounds;
+                for (int i = 1; i < renderers.Length; i++)
+                {
+                    bounds.Encapsulate(renderers[i].bounds);
+                }
+            }
+            
+            (spawnPosition, spawnRotation) = CalculateRelativeSpawnPosition(relativePosition, bounds);
+            Debug.Log($"Using relative position: {relativePosition}");
+        }
+        // PRIORITY 2: Use cached spawn point if available (captured when dictation ended)
+        else if (hasCachedSpawnPoint && cachedSpawnPosition.HasValue && cachedSpawnRotation.HasValue)
         {
             spawnPosition = cachedSpawnPosition.Value;
             spawnRotation = cachedSpawnRotation.Value;
             Debug.Log("Using cached spawn point from when you spoke");
         }
+        // PRIORITY 3: Fallback to current raycast position
         else
         {
-            // Fallback: check current raycast position
             XRRayInteractor activeRayInteractor = GetActiveRayInteractor();
             
             if (activeRayInteractor == null)
@@ -508,7 +539,7 @@ public class VoiceObjectSpawner : MonoBehaviour
             if (activeRayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
             {
                 spawnPosition = hit.point + hit.normal * 0.1f;
-                spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+                spawnRotation = Quaternion.identity; // Keep objects upright
             }
             else
             {
@@ -536,8 +567,8 @@ public class VoiceObjectSpawner : MonoBehaviour
         ClearCachedSpawnPoint();
     }
     
-    // Async version for GLB spawning with color
-    private async System.Threading.Tasks.Task SpawnGLBAtRaycastWithColor(string glbPath, string objectName, string modelId, Color? color)
+    // Async version for GLB spawning with color and optional relative positioning
+    private async System.Threading.Tasks.Task SpawnGLBAtRaycastWithColor(string glbPath, string objectName, string modelId, Color? color, string relativePosition = null)
     {
         if (runtimeModelLoader == null)
         {
@@ -549,16 +580,24 @@ public class VoiceObjectSpawner : MonoBehaviour
         Vector3 spawnPosition;
         Quaternion spawnRotation;
         
-        // Use cached spawn point if available (captured when dictation ended)
-        if (hasCachedSpawnPoint && cachedSpawnPosition.HasValue && cachedSpawnRotation.HasValue)
+        // PRIORITY 1: Use relative position if specified (\"in front of me\", etc.)
+        if (!string.IsNullOrEmpty(relativePosition))
+        {
+            // Use default bounds for GLB (will be adjusted after loading)
+            Bounds estimatedBounds = new Bounds(Vector3.zero, Vector3.one * 0.5f);
+            (spawnPosition, spawnRotation) = CalculateRelativeSpawnPosition(relativePosition, estimatedBounds);
+            Debug.Log($"Using relative position: {relativePosition}");
+        }
+        // PRIORITY 2: Use cached spawn point if available (captured when dictation ended)
+        else if (hasCachedSpawnPoint && cachedSpawnPosition.HasValue && cachedSpawnRotation.HasValue)
         {
             spawnPosition = cachedSpawnPosition.Value;
             spawnRotation = cachedSpawnRotation.Value;
             Debug.Log("Using cached spawn point from when you spoke");
         }
+        // PRIORITY 3: Fallback to current raycast position
         else
         {
-            // Fallback: check current raycast position
             XRRayInteractor activeRayInteractor = GetActiveRayInteractor();
             if (activeRayInteractor == null)
             {
@@ -571,7 +610,7 @@ public class VoiceObjectSpawner : MonoBehaviour
             {
                 // Don't add height offset here - RuntimeModelLoader will adjust based on bounding box
                 spawnPosition = hit.point;
-                spawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+                spawnRotation = Quaternion.identity; // Keep objects upright
             }
             else
             {
@@ -794,6 +833,92 @@ public class VoiceObjectSpawner : MonoBehaviour
         return null;
     }
     
+    /// <summary>
+    /// Calculate spawn position relative to user's camera/position
+    /// </summary>
+    /// <param name="relativePosition">"front", "behind", "left", "right"</param>
+    /// <param name="bounds">Object bounds for distance scaling</param>
+    /// <returns>Position and rotation for spawning</returns>
+    private (Vector3 position, Quaternion rotation) CalculateRelativeSpawnPosition(string relativePosition, Bounds bounds)
+    {
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            Debug.LogError("Main camera not found!");
+            return (Vector3.zero, Quaternion.identity);
+        }
+        
+        Vector3 cameraPos = mainCamera.transform.position;
+        Vector3 forward = mainCamera.transform.forward;
+        Vector3 right = mainCamera.transform.right;
+        
+        // Calculate base distance (1-1.5m, scaled by object size)
+        // Larger objects spawn farther away
+        float objectSize = Mathf.Max(bounds.size.x, bounds.size.z); // Use horizontal size
+        float baseDistance = 1.0f; // Base distance in meters
+        float distanceScale = Mathf.Clamp(objectSize / 0.5f, 1.0f, 1.5f); // Scale based on size
+        float spawnDistance = baseDistance * distanceScale;
+        
+        Vector3 spawnPos;
+        Vector3 directionToCamera;
+        
+        switch (relativePosition?.ToLower())
+        {
+            case "front":
+                // Spawn in front of user
+                spawnPos = cameraPos + forward * spawnDistance;
+                directionToCamera = (cameraPos - spawnPos).normalized;
+                break;
+                
+            case "behind":
+                // Spawn behind user
+                spawnPos = cameraPos - forward * spawnDistance;
+                directionToCamera = (cameraPos - spawnPos).normalized;
+                break;
+                
+            case "left":
+                // Spawn to user's left
+                spawnPos = cameraPos - right * spawnDistance;
+                directionToCamera = (cameraPos - spawnPos).normalized;
+                break;
+                
+            case "right":
+                // Spawn to user's right
+                spawnPos = cameraPos + right * spawnDistance;
+                directionToCamera = (cameraPos - spawnPos).normalized;
+                break;
+                
+            default:
+                Debug.LogWarning($"Unknown relative position: {relativePosition}");
+                return (cameraPos + forward * 1.5f, Quaternion.identity);
+        }
+        
+        // Project down to find floor (AR plane)
+        // Start from slightly above spawn position to ensure we hit the plane
+        Vector3 rayStart = new Vector3(spawnPos.x, cameraPos.y, spawnPos.z);
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, 10f))
+        {
+            // Found floor, use that Y position
+            spawnPos.y = hit.point.y + 0.05f; // Slight offset above floor
+        }
+        else
+        {
+            // No floor found, use camera Y as fallback
+            spawnPos.y = cameraPos.y - 1.0f; // Assume floor is 1m below camera
+        }
+        
+        // Calculate rotation so object faces the user
+        // Remove Y component for horizontal-only rotation
+        directionToCamera.y = 0;
+        directionToCamera.Normalize();
+        
+        Quaternion rotation = Quaternion.LookRotation(directionToCamera);
+        
+        Debug.Log($"[RelativeSpawn] Position: {relativePosition}, Distance: {spawnDistance:F2}m, Pos: {spawnPos}, Facing user: {directionToCamera}");
+        
+        return (spawnPos, rotation);
+    }
+    
     private void DeleteObjectAtRaycast()
     {
         // Get the active ray interactor
@@ -825,6 +950,246 @@ public class VoiceObjectSpawner : MonoBehaviour
         {
             Debug.LogWarning("[VoiceObjectSpawner] Ray interactor did not hit any object to delete!");
         }
+    }
+    
+    /// <summary>
+    /// Delete the object currently being held/grabbed OR pointed at with ray
+    /// If no held/pointed object, search by description (objectName + color)
+    /// </summary>
+    private void DeleteHeldObject(string objectName = null, string color = null)
+    {
+        // PRIORITY 1: Try to get held or pointed object
+        GameObject objectToDelete = GetTargetObject(out string method);
+        
+        if (objectToDelete != null)
+        {
+            Debug.Log($"[VoiceObjectSpawner] Deleting object via {method}: {objectToDelete.name}");
+            
+            // Remove from metadata if exists
+            if (objectMetadata.ContainsKey(objectToDelete))
+            {
+                objectMetadata.Remove(objectToDelete);
+            }
+            
+            Destroy(objectToDelete);
+            UpdateLLMResponseText($"Deleted {objectToDelete.name}!");
+            return;
+        }
+        
+        // PRIORITY 2: Search by description if provided
+        if (!string.IsNullOrEmpty(objectName))
+        {
+            List<GameObject> matches = FindObjectsByDescription(objectName, color);
+            
+            if (matches.Count > 0)
+            {
+                // Delete closest object to camera
+                GameObject closest = GetClosestObject(matches);
+                
+                Debug.Log($"[VoiceObjectSpawner] Deleting object by description ({objectName}, {color}): {closest.name}");
+                
+                // Remove from metadata
+                if (objectMetadata.ContainsKey(closest))
+                {
+                    objectMetadata.Remove(closest);
+                }
+                
+                Destroy(closest);
+                UpdateLLMResponseText($"Deleted {closest.name}!");
+                return;
+            }
+            else
+            {
+                // No matches found
+                string searchDesc = !string.IsNullOrEmpty(color) ? $"{color} {objectName}" : objectName;
+                Debug.LogWarning($"[VoiceObjectSpawner] No {searchDesc} found to delete!");
+                UpdateLLMResponseText($"I couldn't find a {searchDesc} to delete.");
+                return;
+            }
+        }
+        
+        // No object found and no description provided
+        Debug.LogWarning("[VoiceObjectSpawner] No object is being held or pointed at!");
+        UpdateLLMResponseText("Please grab or point at an object, or describe it (e.g., 'delete the pink chair').");
+    }
+    
+    /// <summary>
+    /// Scale the object currently being held/grabbed OR pointed at with ray
+    /// </summary>
+    private void ScaleHeldObject(float scaleFactor)
+    {
+        GameObject objectToScale = GetTargetObject(out string method);
+        
+        if (objectToScale != null)
+        {
+            // Clamp scale factor
+            float clampedFactor = Mathf.Clamp(scaleFactor, 0.1f, 5.0f);
+            
+            // Apply uniform scale
+            Vector3 newScale = objectToScale.transform.localScale * clampedFactor;
+            
+            // Clamp total scale to prevent objects from becoming too small or too large
+            float maxScaleComponent = Mathf.Max(newScale.x, newScale.y, newScale.z);
+            float minScaleComponent = Mathf.Min(newScale.x, newScale.y, newScale.z);
+            
+            if (maxScaleComponent > 10.0f || minScaleComponent < 0.01f)
+            {
+                Debug.LogWarning($"[VoiceObjectSpawner] Scale clamped - would result in too large or too small object");
+                UpdateLLMResponseText("Can't scale that much - object would be too big or too small!");
+                return;
+            }
+            
+            objectToScale.transform.localScale = newScale;
+            
+            Debug.Log($"[VoiceObjectSpawner] Scaled {objectToScale.name} via {method} by {clampedFactor}x. New scale: {newScale}");
+            UpdateLLMResponseText($"Scaled to {clampedFactor}x!");
+        }
+        else
+        {
+            Debug.LogWarning("[VoiceObjectSpawner] No object is being held or pointed at!");
+            UpdateLLMResponseText("Please grab or point at an object, then say 'make it bigger' or 'make it smaller'.");
+        }
+    }
+    
+    /// <summary>
+    /// Get the target object - either held by hand OR pointed at with ray
+    /// Priority: Held object first (right hand, then left), then raycast
+    /// </summary>
+    private GameObject GetTargetObject(out string method)
+    {
+        method = "";
+        
+        // PRIORITY 1: Check if holding an object with RIGHT hand (most people are right-handed)
+        if (rightDirectInteractor != null && rightDirectInteractor.enabled && rightDirectInteractor.hasSelection)
+        {
+            var selectedObjects = rightDirectInteractor.interactablesSelected;
+            if (selectedObjects.Count > 0)
+            {
+                method = "RIGHT HAND";
+                return selectedObjects[0].transform.gameObject;
+            }
+        }
+        
+        // PRIORITY 2: Check left hand
+        if (leftDirectInteractor != null && leftDirectInteractor.enabled && leftDirectInteractor.hasSelection)
+        {
+            var selectedObjects = leftDirectInteractor.interactablesSelected;
+            if (selectedObjects.Count > 0)
+            {
+                method = "LEFT HAND";
+                return selectedObjects[0].transform.gameObject;
+            }
+        }
+        
+        // PRIORITY 2: Check what ray is pointing at
+        XRRayInteractor activeRay = GetActiveRayInteractor();
+        if (activeRay != null && activeRay.TryGetCurrent3DRaycastHit(out RaycastHit hit))
+        {
+            GameObject hitObject = hit.collider.gameObject;
+            
+            // Don't target AR planes
+            if (hitObject.GetComponent<UnityEngine.XR.ARFoundation.ARPlane>() != null)
+            {
+                Debug.Log("[VoiceObjectSpawner] Ray hit AR plane - ignoring");
+                return null;
+            }
+            
+            method = "RAYCAST";
+            return hitObject;
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Find all spawned objects matching the description
+    /// </summary>
+    private List<GameObject> FindObjectsByDescription(string objectName, string color)
+    {
+        List<GameObject> matches = new List<GameObject>();
+        
+        foreach (var kvp in objectMetadata)
+        {
+            GameObject obj = kvp.Key;
+            ObjectMetadata meta = kvp.Value;
+            
+            if (obj == null) continue; // Object was destroyed
+            
+            // Check if object type matches (case-insensitive)
+            bool typeMatches = meta.objectType.Equals(objectName, System.StringComparison.OrdinalIgnoreCase);
+            
+            // If color specified, check color match
+            bool colorMatches = true;
+            if (!string.IsNullOrEmpty(color))
+            {
+                colorMatches = !string.IsNullOrEmpty(meta.color) && 
+                              meta.color.Equals(color, System.StringComparison.OrdinalIgnoreCase);
+            }
+            
+            if (typeMatches && colorMatches)
+            {
+                matches.Add(obj);
+            }
+        }
+        
+        Debug.Log($"[FindObjects] Found {matches.Count} matches for {objectName} {color}");
+        return matches;
+    }
+    
+    /// <summary>
+    /// Get the closest object to the camera from a list
+    /// </summary>
+    private GameObject GetClosestObject(List<GameObject> objects)
+    {
+        if (objects.Count == 0) return null;
+        if (objects.Count == 1) return objects[0];
+        
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null) return objects[0];
+        
+        GameObject closest = objects[0];
+        float closestDistance = Vector3.Distance(mainCamera.transform.position, closest.transform.position);
+        
+        for (int i = 1; i < objects.Count; i++)
+        {
+            float distance = Vector3.Distance(mainCamera.transform.position, objects[i].transform.position);
+            if (distance < closestDistance)
+            {
+                closest = objects[i];
+                closestDistance = distance;
+            }
+        }
+        
+        Debug.Log($"[GetClosest] Closest object: {closest.name} at {closestDistance:F2}m");
+        return closest;
+    }
+    
+    /// <summary>
+    /// Find the Left Direct Interactor in the scene
+    /// </summary>
+    private XRDirectInteractor FindLeftDirectInteractor()
+    {
+        // Try to find in the XR Rig hierarchy
+        GameObject leftController = GameObject.Find("Left Controller");
+        if (leftController != null)
+        {
+            return leftController.GetComponent<XRDirectInteractor>();
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Find the Right Direct Interactor in the scene
+    /// </summary>
+    private XRDirectInteractor FindRightDirectInteractor()
+    {
+        // Try to find in the XR Rig hierarchy
+        GameObject rightController = GameObject.Find("Right Controller");
+        if (rightController != null)
+        {
+            return rightController.GetComponent<XRDirectInteractor>();
+        }
+        return null;
     }
     
     private System.Collections.IEnumerator EnablePhysicsAfterDelay(Rigidbody rb, float delay)
@@ -1033,7 +1398,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         if (activeRayInteractor.TryGetCurrent3DRaycastHit(out RaycastHit hit))
         {
             cachedSpawnPosition = hit.point + hit.normal * 0.1f;
-            cachedSpawnRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+            cachedSpawnRotation = Quaternion.identity; // Keep objects upright
             hasCachedSpawnPoint = true;
             Debug.Log($"Captured spawn point at: {cachedSpawnPosition}");
         }
@@ -1103,10 +1468,10 @@ public class VoiceObjectSpawner : MonoBehaviour
             return;
         }
         
-        // Calculate bounding box that encompasses all renderers
-        Bounds combinedBounds = CalculateCombinedBounds(obj);
+        // Calculate bounding box in LOCAL SPACE (same method as RuntimeModelLoader)
+        Bounds localBounds = CalculateCombinedBounds(obj);
         
-        if (combinedBounds.size == Vector3.zero)
+        if (localBounds.size == Vector3.zero)
         {
             Debug.LogWarning("Object has no renderers or bounds");
             return;
@@ -1123,10 +1488,13 @@ public class VoiceObjectSpawner : MonoBehaviour
             Destroy(boxCollider);
         }
         
-        // Position and scale to match object bounds (with padding)
-        highlightBoundingBox.transform.position = combinedBounds.center;
-        highlightBoundingBox.transform.rotation = obj.transform.rotation;
-        highlightBoundingBox.transform.localScale = combinedBounds.size + Vector3.one * boundingBoxPadding;
+        // Parent it FIRST, then use local space positioning
+        highlightBoundingBox.transform.SetParent(obj.transform, false);
+        
+        // Set position and size in LOCAL space (bounds are already in local space)
+        highlightBoundingBox.transform.localPosition = localBounds.center;
+        highlightBoundingBox.transform.localRotation = Quaternion.identity;
+        highlightBoundingBox.transform.localScale = localBounds.size + Vector3.one * boundingBoxPadding;
         
         // Apply translucent material
         Renderer boxRenderer = highlightBoundingBox.GetComponent<Renderer>();
@@ -1134,30 +1502,59 @@ public class VoiceObjectSpawner : MonoBehaviour
         {
             boxRenderer.material = highlightMaterial;
         }
-        
-        // Make it a child of the highlighted object so it moves with it
-        highlightBoundingBox.transform.SetParent(obj.transform, true);
     }
     
     private Bounds CalculateCombinedBounds(GameObject obj)
     {
-        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+        MeshFilter[] meshFilters = obj.GetComponentsInChildren<MeshFilter>();
         
-        if (renderers.Length == 0)
+        if (meshFilters.Length == 0)
         {
-            return new Bounds(obj.transform.position, Vector3.zero);
+            // Fallback to renderer bounds if no meshes
+            Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0)
+            {
+                return new Bounds(obj.transform.position, Vector3.zero);
+            }
+            
+            Bounds bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+            return bounds;
+        }
+
+        // Calculate bounds from actual mesh vertices in LOCAL SPACE (same as RuntimeModelLoader)
+        Vector3 min = Vector3.positiveInfinity;
+        Vector3 max = Vector3.negativeInfinity;
+        
+        Transform rootTransform = obj.transform;
+        
+        foreach (MeshFilter meshFilter in meshFilters)
+        {
+            if (meshFilter.sharedMesh == null) continue;
+            
+            Mesh mesh = meshFilter.sharedMesh;
+            Vector3[] vertices = mesh.vertices;
+            Transform meshTransform = meshFilter.transform;
+            
+            // Transform each vertex to root's local space
+            foreach (Vector3 vertex in vertices)
+            {
+                Vector3 worldVertex = meshTransform.TransformPoint(vertex);
+                Vector3 localVertex = rootTransform.InverseTransformPoint(worldVertex);
+                
+                min = Vector3.Min(min, localVertex);
+                max = Vector3.Max(max, localVertex);
+            }
         }
         
-        // Start with first renderer's bounds
-        Bounds bounds = renderers[0].bounds;
+        Vector3 center = (min + max) * 0.5f;
+        Vector3 size = max - min;
         
-        // Encapsulate all other renderers
-        for (int i = 1; i < renderers.Length; i++)
-        {
-            bounds.Encapsulate(renderers[i].bounds);
-        }
-        
-        return bounds;
+        // Return bounds in LOCAL space
+        return new Bounds(center, size);
     }
     
     private void ClearHighlight()

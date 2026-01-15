@@ -11,8 +11,7 @@ using System.Collections.Generic;
 public class PlaneCollisionDetector : MonoBehaviour
 {
     [Header("Visual Feedback")]
-    [SerializeField] private Material invalidMaterial; // Drag red semi-transparent material here
-    [SerializeField] private Color validColor = Color.white;
+    [SerializeField] private Material invalidMaterial; // Red semi-transparent material for invalid placement
     
     private Dictionary<Renderer, Material[]> originalMaterialsPerRenderer = new Dictionary<Renderer, Material[]>();
     private Dictionary<Renderer, Material[]> instancedMaterialsPerRenderer = new Dictionary<Renderer, Material[]>();

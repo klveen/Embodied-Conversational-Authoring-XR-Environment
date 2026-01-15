@@ -79,6 +79,11 @@ CLAUDE_TOOLS = [
                     "type": "integer",
                     "description": "Number of objects to spawn. Default is 1.",
                     "default": 1
+                },
+                "relativePosition": {
+                    "type": "string",
+                    "enum": ["front", "behind", "left", "right"],
+                    "description": "Optional: Spawn relative to user position. Use 'front' for 'in front of me', 'behind' for 'behind me', 'left' for 'to my left', 'right' for 'to my right'. If user mentions relative position, use this instead of raycast. If not specified, use raycast placement."
                 }
             },
             "required": ["objectName", "modelId"]
@@ -86,11 +91,38 @@ CLAUDE_TOOLS = [
     },
     {
         "name": "delete_furniture",
-        "description": "Delete the furniture object that the user is currently pointing at with their VR controller. Use this when user says delete, remove, get rid of, etc.",
+        "description": "Delete furniture from the scene. Extract objectName and color if mentioned in user's command. Examples: 'delete the pink chair' → objectName='chair', color='pink'. 'remove the table' → objectName='table'. 'delete this' → no parameters.",
         "input_schema": {
             "type": "object",
-            "properties": {},  # No parameters needed - deletes whatever user is pointing at
+            "properties": {
+                "objectName": {
+                    "type": "string",
+                    "enum": ["chair", "table", "sofa", "couch", "lamp", "bed", "desk", "shelf", "bench", "stool"],
+                    "description": "Furniture type mentioned by user"
+                },
+                "color": {
+                    "type": "string",
+                    "enum": ["red", "blue", "green", "yellow", "white", "black", "brown", "orange", "purple", "pink", "gray"],
+                    "description": "Color mentioned by user (if any)"
+                }
+            },
             "required": []
+        }
+    },
+    {
+        "name": "scale_furniture",
+        "description": "Scale (resize) the furniture object that the user is either holding/grabbing with their hand OR pointing at with the ray. Use this when user says 'make it bigger', 'make it smaller', 'scale up', 'resize', etc. Works with both held objects and raycast-pointed objects.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "scaleFactor": {
+                    "type": "number",
+                    "description": "The multiplier to scale the object. Examples: 1.2 for 20 percent bigger, 0.8 for 20 percent smaller, 2.0 for double size, 0.5 for half size. Must be between 0.1 and 5.0.",
+                    "minimum": 0.1,
+                    "maximum": 5.0
+                }
+            },
+            "required": ["scaleFactor"]
         }
     },
     {
@@ -145,9 +177,20 @@ def process_command():
         response = client.messages.create(
             model=MODEL_NAME,
             max_tokens=300,
-            system=f"You are a VR furniture placement assistant. Choose the most contextually appropriate model ID based on user intent.{inventory_context}",
+            system=f"""You are a VR furniture placement assistant. You MUST use the provided tools for all furniture actions.
+
+CRITICAL: When user says delete/remove + furniture description, ALWAYS call delete_furniture tool with parameters.
+- "delete the pink chair" → CALL delete_furniture(objectName="chair", color="pink")
+- "remove the blue table" → CALL delete_furniture(objectName="table", color="blue")  
+- "get rid of the lamp" → CALL delete_furniture(objectName="lamp")
+- "delete this" → CALL delete_furniture() with no parameters
+
+Do NOT give conversational responses for delete/remove commands. ALWAYS use the tool.
+
+{inventory_context}""",
             tools=CLAUDE_TOOLS,
-            messages=[{"role": "user", "content": user_command}]
+            messages=[{"role": "user", "content": user_command}],
+            tool_choice={"type": "auto"}  # Force tool use when appropriate
         )
         
         print(f"[LLM Server] Stop reason: {response.stop_reason}")
@@ -171,6 +214,7 @@ def process_command():
             result.setdefault('scale', 1.0)
             
             print(f"[LLM Server] Returning: {result}")
+            print(f"[LLM Server] Keys in result: {list(result.keys())}")
             return jsonify(result), 200
         else:
             # Conversational response

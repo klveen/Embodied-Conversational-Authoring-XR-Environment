@@ -181,29 +181,34 @@ public class RuntimeModelLoader : MonoBehaviour
                     Debug.LogWarning("[RuntimeModelLoader] No fallback material assigned - using GLB's original materials (may have issues)");
                 }
                 
-                Debug.Log("[RuntimeModelLoader] Materials applied, calculating bounds...");
+                Debug.Log("[RuntimeModelLoader] Materials applied, applying rotation...");
                 
                 // Wait for bounds to be calculated properly
                 await Task.Yield();
                 await Task.Yield();
                 
-                // Calculate bounds and setup collider
+                // GLB files have Z-up, Unity needs Y-up: rotate -90° around X
+                Debug.Log("[RuntimeModelLoader] Rotating model: Z-up to Y-up conversion");
+                modelContainer.transform.localRotation = Quaternion.Euler(-90, 0, 0);
+                
+                // Wait for transform update
+                await Task.Yield();
+                
+                // Calculate bounds AFTER rotation
                 Bounds combinedBounds = CalculateCombinedBounds(modelContainer);
-                
-                // Auto-correct orientation based on bounding box
-                CorrectModelOrientation(modelContainer, combinedBounds);
-                
-                // Recalculate bounds after orientation correction
-                combinedBounds = CalculateCombinedBounds(modelContainer);
+                Debug.Log($"[RuntimeModelLoader] Bounds after rotation: center={combinedBounds.center}, size={combinedBounds.size}, min.y={combinedBounds.min.y}");
                 
                 // Setup collider first (before adjusting position)
                 SetupCollider(rootObject, combinedBounds);
                 
-                // Adjust spawn position to sit on surface based on bounds minimum Y
-                // Move object up so its bottom (bounds.min.y) sits at spawn point
-                float bottomToCenter = -combinedBounds.min.y; // Distance from center to bottom
-                rootObject.transform.position += Vector3.up * bottomToCenter;
-                Debug.Log($"[RuntimeModelLoader] Adjusted spawn position up by {bottomToCenter:F3}m to sit bottom on surface");
+                // Adjust spawn position so object's bottom sits exactly on the spawn point
+                // We need to move the object down by the bounds center offset, then up by the bounds extent
+                // Net effect: move up by (extent - center.y) = move down by (center.y - extent)
+                float boundsCenterY = combinedBounds.center.y;
+                float boundsMinY = combinedBounds.min.y;
+                float heightAdjustment = -boundsCenterY; // Move down to align bounds center with origin, then min.y sits on floor
+                rootObject.transform.position += Vector3.up * heightAdjustment;
+                Debug.Log($"[RuntimeModelLoader] Bounds center.y={boundsCenterY:F3}, min.y={boundsMinY:F3}, adjusted position by {heightAdjustment:F3}m");
 
                 // Optional: Show bounding box visual
                 if (showBoundingBox)
@@ -218,16 +223,31 @@ public class RuntimeModelLoader : MonoBehaviour
                     rb.isKinematic = true;
                     rb.velocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
+                    Debug.Log($"[RuntimeModelLoader] Set rigidbody to kinematic, position={rootObject.transform.position}");
                 }
                 
                 // NOW show the object (materials are fixed, position adjusted, kinematic)
                 rootObject.SetActive(true);
+                Debug.Log($"[RuntimeModelLoader] Object activated at position: {rootObject.transform.position}");
                 
-                // Wait for physics to settle, then enable
+                // DEBUG: Print transform hierarchy to understand rotation issues
+                PrintTransformHierarchy(rootObject.transform, 0);
+                
+                // Wait longer for physics system to fully initialize colliders
                 if (rb != null)
                 {
-                    await Task.Delay(100); // Shorter delay since we're already stable
+                    await Task.Delay(300); // Increased delay to ensure colliders are ready
+                    
+                    // Verify collider is properly setup before enabling physics
+                    BoxCollider collider = rootObject.GetComponent<BoxCollider>();
+                    if (collider != null)
+                    {
+                        Debug.Log($"[RuntimeModelLoader] Collider ready - center: {collider.center}, size: {collider.size}");
+                    }
+                    
+                    // Re-enable physics now that everything is stable
                     rb.isKinematic = false;
+                    Debug.Log($"[RuntimeModelLoader] Physics enabled, final position: {rootObject.transform.position}");
                 }
 
                 Debug.Log($"[RuntimeModelLoader] Successfully spawned: {glbFilePath}");
@@ -274,9 +294,19 @@ public class RuntimeModelLoader : MonoBehaviour
         rb.mass = defaultMass;
         rb.useGravity = useGravity;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
-        // Add drag to slow down physics and prevent flying furniture
-        rb.drag = 2f;
-        rb.angularDrag = 2f;
+        
+        // START KINEMATIC - will be disabled after setup is complete
+        rb.isKinematic = true;
+        
+        // Enhanced drag for smooth, stable movement (no flying or jittery furniture)
+        rb.drag = 8f;  // Increased for smoother deceleration
+        rb.angularDrag = 15f;  // Increased to prevent rotation wobble
+        
+        // FREEZE ROTATION: Keep objects perfectly upright (only allow horizontal spinning)
+        rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+        
+        // Interpolation for smoother visual movement
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
 
         // XR Grab Interactable
         XRGrabInteractable grabInteractable = rootObject.GetComponent<XRGrabInteractable>();
@@ -303,14 +333,14 @@ public class RuntimeModelLoader : MonoBehaviour
         grabInteractable.snapToColliderVolume = false; // Don't snap to object center
         grabInteractable.retainTransformParent = true; // Keep object in world space
         
-        // Smooth tracking with physics
+        // Smooth tracking with physics - optimized for best UX
         grabInteractable.smoothPosition = true;
-        grabInteractable.smoothPositionAmount = 5f; // Lower = smoother but more lag
-        grabInteractable.tightenPosition = 0.5f;
+        grabInteractable.smoothPositionAmount = 15f; // Higher = smoother but slightly delayed response
+        grabInteractable.tightenPosition = 0.8f;  // Higher = tighter tracking when close to target
         
         grabInteractable.smoothRotation = true;
-        grabInteractable.smoothRotationAmount = 5f;
-        grabInteractable.tightenRotation = 0.5f;
+        grabInteractable.smoothRotationAmount = 15f;  // Higher = smoother rotation
+        grabInteractable.tightenRotation = 0.8f;  // Higher = more stable rotation
         
         // No ease-in for immediate response
         grabInteractable.attachEaseInTime = 0f;
@@ -327,12 +357,12 @@ public class RuntimeModelLoader : MonoBehaviour
             rootObject.AddComponent<BoxCollider>();
         }
         
-        // DISABLED: Add FloorSnapper to automatically snap to floor on release
-        // FloorSnapper floorSnapper = rootObject.GetComponent<FloorSnapper>();
-        // if (floorSnapper == null)
-        // {
-        //     floorSnapper = rootObject.AddComponent<FloorSnapper>();
-        // }
+        // Add FloorSnapper to automatically snap to floor on release (Sims-style behavior)
+        FloorSnapper floorSnapper = rootObject.GetComponent<FloorSnapper>();
+        if (floorSnapper == null)
+        {
+            floorSnapper = rootObject.AddComponent<FloorSnapper>();
+        }
         
         // Add PlaneCollisionDetector for visual feedback and selective collision
         PlaneCollisionDetector collisionDetector = rootObject.GetComponent<PlaneCollisionDetector>();
@@ -795,15 +825,32 @@ public class RuntimeModelLoader : MonoBehaviour
                 Debug.Log($"[RuntimeModelLoader] Applied fallback material to {renderers.Length} renderers");
             }
             
-            Debug.Log("[RuntimeModelLoader] Materials applied, calculating bounds...");
+            Debug.Log("[RuntimeModelLoader] Materials applied, applying rotation and calculating bounds...");
             
             // Wait for bounds to be calculated properly
             await Task.Yield();
             await Task.Yield();
             
-            // Calculate bounds and setup collider
+            // GLB files have Z-up, Unity needs Y-up: rotate -90° around X
+            Debug.Log("[RuntimeModelLoader] Rotating model for URL load: Z-up to Y-up conversion");
+            modelContainer.transform.localRotation = Quaternion.Euler(-90, 0, 0);
+            
+            // Wait for transform update
+            await Task.Yield();
+            
+            // Calculate bounds AFTER rotation and setup collider
             Bounds combinedBounds = CalculateCombinedBounds(modelContainer);
+            Debug.Log($"[RuntimeModelLoader] Bounds after rotation: center={combinedBounds.center}, size={combinedBounds.size}, min.y={combinedBounds.min.y}");
+            
             SetupCollider(rootObject, combinedBounds);
+            
+            // Adjust spawn position so object's bottom sits exactly on the spawn point
+            // We need to move the object down by the bounds center offset
+            float boundsCenterY = combinedBounds.center.y;
+            float boundsMinY = combinedBounds.min.y;
+            float heightAdjustment = -boundsCenterY; // Move down to align bounds center with origin, then min.y sits on floor
+            rootObject.transform.position += Vector3.up * heightAdjustment;
+            Debug.Log($"[RuntimeModelLoader] Bounds center.y={boundsCenterY:F3}, min.y={boundsMinY:F3}, adjusted position by {heightAdjustment:F3}m");
 
             // Optional: Show bounding box visual
             if (showBoundingBox)
@@ -826,6 +873,20 @@ public class RuntimeModelLoader : MonoBehaviour
                 Destroy(rootObject);
                 
             return null;
+        }
+    }
+    
+    /// <summary>
+    /// Debug helper to print transform hierarchy
+    /// </summary>
+    private void PrintTransformHierarchy(Transform t, int depth)
+    {
+        string indent = new string(' ', depth * 2);
+        Debug.Log($"{indent}[{t.name}] Pos: {t.localPosition:F2}, Rot: {t.localRotation.eulerAngles:F1}, Scale: {t.localScale:F2}");
+        
+        foreach (Transform child in t)
+        {
+            PrintTransformHierarchy(child, depth + 1);
         }
     }
 }
