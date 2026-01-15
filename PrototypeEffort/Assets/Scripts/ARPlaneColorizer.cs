@@ -20,6 +20,7 @@ public class ARPlaneColorizer : MonoBehaviour
         void Start()
         {
            UpdatePlaneColor();
+           HidePlaneOutline(); // Hide outline at start
            ConfigurePlaneCollision();
         }
         
@@ -59,9 +60,24 @@ public class ARPlaneColorizer : MonoBehaviour
         
         void UpdatePlaneColor()
         {
-            // Set all planes to white with transparency
+            // Start planes invisible (SceneManager will control visibility)
             Color planeMatColor = Color.white;
-            planeMatColor.a = 0.33f;
+            planeMatColor.a = 0f; // Start completely transparent
             m_PlaneMeshRenderer.material.color = planeMatColor;
+        }
+        
+        void HidePlaneOutline()
+        {
+            // Hide the LineRenderer outline at start
+            LineRenderer lineRenderer = GetComponent<LineRenderer>();
+            if (lineRenderer != null)
+            {
+                Color startColor = lineRenderer.startColor;
+                Color endColor = lineRenderer.endColor;
+                startColor.a = 0f; // Transparent
+                endColor.a = 0f;   // Transparent
+                lineRenderer.startColor = startColor;
+                lineRenderer.endColor = endColor;
+            }
         }
 }

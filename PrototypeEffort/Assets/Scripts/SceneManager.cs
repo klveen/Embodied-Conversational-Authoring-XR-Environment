@@ -10,16 +10,16 @@ public class SceneManager : MonoBehaviour
     [Header("AR Plane Settings")]
     [SerializeField] private InputActionReference togglePlanesAction;
     private ARPlaneManager arPlaneManager;
-    private bool isPlaneVisible = false;
+    private bool isPlaneVisible = false; // Start with planes INVISIBLE
 
     void Start()
     {
         arPlaneManager = GetComponent<ARPlaneManager>();
         
-        // Set initial plane visibility (hidden by default)
+        // Set initial plane visibility (invisible by default)
         foreach (var plane in arPlaneManager.trackables)
         {
-            SetPlaneVisibility(plane, 0f, 0f);
+            SetPlaneVisibility(plane, 0f, 0f); // Invisible
         }
         
         // Enable toggle planes action
@@ -53,12 +53,19 @@ public class SceneManager : MonoBehaviour
     
     private void OnPlanesChanged(ARPlanesChangedEventArgs args)
     {
-        // Hide newly added planes if visibility is off
+        // Set visibility for newly added planes based on current state
         if (!isPlaneVisible)
         {
             foreach (var plane in args.added)
             {
-                SetPlaneVisibility(plane, 0f, 0f);
+                SetPlaneVisibility(plane, 0f, 0f); // Hide
+            }
+        }
+        else
+        {
+            foreach (var plane in args.added)
+            {
+                SetPlaneVisibility(plane, 0.33f, 1.0f); // Show
             }
         }
     }
