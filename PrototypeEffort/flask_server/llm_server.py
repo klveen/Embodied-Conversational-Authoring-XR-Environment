@@ -72,8 +72,18 @@ CLAUDE_TOOLS = [
                 },
                 "color": {
                     "type": "string",
-                    "enum": ["red", "blue", "green", "yellow", "white", "black", "brown", "orange", "purple", "pink", "gray"],
-                    "description": "Optional: The color to apply to the furniture. Only include if user specifies a color."
+                    "enum": [
+                        "red", "light_red", "dark_red",
+                        "blue", "light_blue", "dark_blue",
+                        "green", "light_green", "dark_green",
+                        "yellow", "light_yellow", "dark_yellow",
+                        "orange", "light_orange", "dark_orange",
+                        "purple", "light_purple", "dark_purple",
+                        "pink", "light_pink", "dark_pink",
+                        "brown", "light_brown", "dark_brown",
+                        "white", "black", "gray"
+                    ],
+                    "description": "Optional: The color to apply to the furniture. Only include if user specifies a color. Supports light and dark variations for most colors."
                 },
                 "quantity": {
                     "type": "integer",
@@ -102,7 +112,17 @@ CLAUDE_TOOLS = [
                 },
                 "color": {
                     "type": "string",
-                    "enum": ["red", "blue", "green", "yellow", "white", "black", "brown", "orange", "purple", "pink", "gray"],
+                    "enum": [
+                        "red", "light_red", "dark_red",
+                        "blue", "light_blue", "dark_blue",
+                        "green", "light_green", "dark_green",
+                        "yellow", "light_yellow", "dark_yellow",
+                        "orange", "light_orange", "dark_orange",
+                        "purple", "light_purple", "dark_purple",
+                        "pink", "light_pink", "dark_pink",
+                        "brown", "light_brown", "dark_brown",
+                        "white", "black", "gray"
+                    ],
                     "description": "Color mentioned by user (if any)"
                 }
             },
@@ -127,22 +147,27 @@ CLAUDE_TOOLS = [
     },
     {
         "name": "modify_furniture",
-        "description": "Modify the furniture object that the user is currently pointing at. Can change color or spawn a different variation of the same object type.",
+        "description": "ONLY for changing the COLOR of the furniture object that the user is currently pointing at. Use this ONLY when user wants to change/modify the color (e.g., 'make it blue', 'change color to red'). DO NOT use this for requesting different models or variations - that functionality is not available.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "color": {
                     "type": "string",
-                    "enum": ["red", "blue", "green", "yellow", "white", "black", "brown", "orange", "purple", "pink", "gray"],
-                    "description": "Optional: New color to apply. Include only if user wants to change color (e.g. 'make it blue')."
-                },
-                "variation": {
-                    "type": "boolean",
-                    "description": "Set to true if user wants a different model/variation (e.g. 'different chair', 'another one'). Default false.",
-                    "default": False
+                    "enum": [
+                        "red", "light_red", "dark_red",
+                        "blue", "light_blue", "dark_blue",
+                        "green", "light_green", "dark_green",
+                        "yellow", "light_yellow", "dark_yellow",
+                        "orange", "light_orange", "dark_orange",
+                        "purple", "light_purple", "dark_purple",
+                        "pink", "light_pink", "dark_pink",
+                        "brown", "light_brown", "dark_brown",
+                        "white", "black", "gray"
+                    ],
+                    "description": "The new color to apply to the pointed object. Supports light and dark variations."
                 }
             },
-            "required": []  # Both parameters are optional
+            "required": ["color"]
         }
     }
 ]
@@ -177,15 +202,39 @@ def process_command():
         response = client.messages.create(
             model=MODEL_NAME,
             max_tokens=300,
-            system=f"""You are a VR furniture placement assistant. You MUST use the provided tools for all furniture actions.
+            system=f"""You are a friendly VR furniture placement assistant. Follow the users' commands to spawn, delete, modify, or scale furniture in an AR environment. Be conversational when the prompt does not require tool use.
+
+TONE: Keep responses short, natural, and friendly. Don't over-explain unless asked.
+- ✅ "Done!" or "There you go!" after simple actions
+- ✅ "Making it brown for you!" when applying colors
+- ✅ "I have office chairs, dining chairs, and recliners - which would you like?" when offering options
+- ❌ Avoid: "I am now calling the spawn_furniture function with the following parameters..."
+
+OFFERING OPTIONS: When user asks for furniture without specifics, mention available subcategories:
+- "chair" → mention: office chairs, dining chairs, recliners, armchairs
+- "table" → mention: dining tables, coffee tables, desk tables
+- "sofa" → mention: sectional sofas, loveseats, 3-seater sofas
+Look at the subcategories in the inventory and suggest 2-3 options naturally.
+
+PLACEMENT HELP: If user asks how to place/spawn objects, explain:
+"You can point with the raycast if you have a position far from you where you want to place, for example, a coffee table. But you can also say put a table in front of me!"
 
 CRITICAL: When user says delete/remove + furniture description, ALWAYS call delete_furniture tool with parameters.
 - "delete the pink chair" → CALL delete_furniture(objectName="chair", color="pink")
 - "remove the blue table" → CALL delete_furniture(objectName="table", color="blue")  
-- "get rid of the lamp" → CALL delete_furniture(objectName="lamp")
 - "delete this" → CALL delete_furniture() with no parameters
 
-Do NOT give conversational responses for delete/remove commands. ALWAYS use the tool.
+IMPORTANT: The modify_furniture tool is ONLY for changing colors.
+- If user says "make this a different chair" → respond: "I can only change colors right now!"
+- If user says "make it blue" → CALL modify_furniture(color="blue") + say "Done!"
+
+MATERIAL COLORS: Translate materials to colors naturally:
+- "wood" → brown (say: "Making it brown like wood!")
+- "metal/steel" → gray (say: "Going with gray for that metallic look!")
+- "gold" → yellow (say: "Golden yellow coming up!")
+- "silver" → gray
+- "bronze/copper" → orange or brown
+- "marble" → white
 
 {inventory_context}""",
             tools=CLAUDE_TOOLS,

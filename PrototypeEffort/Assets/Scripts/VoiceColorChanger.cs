@@ -23,18 +23,51 @@ public class VoiceColorChanger : MonoBehaviour
     [Header("Color Library")]
     [SerializeField] private List<ColorMapping> colorMappings = new List<ColorMapping>()
     {
-        // Default color palette
+        // Default color palette with variations
+        // Red variations
         new ColorMapping { colorName = "red", color = Color.red, keywords = new List<string> { "red", "rouge" } },
+        new ColorMapping { colorName = "light_red", color = new Color(1f, 0.5f, 0.5f), keywords = new List<string> { "light red", "light_red", "rouge clair" } },
+        new ColorMapping { colorName = "dark_red", color = new Color(0.5f, 0f, 0f), keywords = new List<string> { "dark red", "dark_red", "rouge foncé" } },
+        
+        // Blue variations
         new ColorMapping { colorName = "blue", color = Color.blue, keywords = new List<string> { "blue", "bleu" } },
+        new ColorMapping { colorName = "light_blue", color = new Color(0.53f, 0.81f, 0.98f), keywords = new List<string> { "light blue", "light_blue", "bleu clair" } },
+        new ColorMapping { colorName = "dark_blue", color = new Color(0f, 0f, 0.55f), keywords = new List<string> { "dark blue", "dark_blue", "bleu foncé" } },
+        
+        // Green variations
         new ColorMapping { colorName = "green", color = Color.green, keywords = new List<string> { "green", "vert" } },
+        new ColorMapping { colorName = "light_green", color = new Color(0.56f, 0.93f, 0.56f), keywords = new List<string> { "light green", "light_green", "vert clair" } },
+        new ColorMapping { colorName = "dark_green", color = new Color(0f, 0.39f, 0f), keywords = new List<string> { "dark green", "dark_green", "vert foncé" } },
+        
+        // Yellow variations
         new ColorMapping { colorName = "yellow", color = Color.yellow, keywords = new List<string> { "yellow", "jaune" } },
+        new ColorMapping { colorName = "light_yellow", color = new Color(1f, 1f, 0.88f), keywords = new List<string> { "light yellow", "light_yellow", "jaune clair" } },
+        new ColorMapping { colorName = "dark_yellow", color = new Color(0.8f, 0.8f, 0f), keywords = new List<string> { "dark yellow", "dark_yellow", "jaune foncé" } },
+        
+        // Orange variations
+        new ColorMapping { colorName = "orange", color = new Color(1f, 0.5f, 0f), keywords = new List<string> { "orange" } },
+        new ColorMapping { colorName = "light_orange", color = new Color(1f, 0.8f, 0.6f), keywords = new List<string> { "light orange", "light_orange", "orange clair" } },
+        new ColorMapping { colorName = "dark_orange", color = new Color(1f, 0.27f, 0f), keywords = new List<string> { "dark orange", "dark_orange", "orange foncé" } },
+        
+        // Purple variations
+        new ColorMapping { colorName = "purple", color = new Color(0.5f, 0f, 1f), keywords = new List<string> { "purple", "violet" } },
+        new ColorMapping { colorName = "light_purple", color = new Color(0.87f, 0.63f, 0.87f), keywords = new List<string> { "light purple", "light_purple", "violet clair" } },
+        new ColorMapping { colorName = "dark_purple", color = new Color(0.29f, 0f, 0.51f), keywords = new List<string> { "dark purple", "dark_purple", "violet foncé" } },
+        
+        // Pink variations
+        new ColorMapping { colorName = "pink", color = new Color(1f, 0.75f, 0.8f), keywords = new List<string> { "pink", "rose" } },
+        new ColorMapping { colorName = "light_pink", color = new Color(1f, 0.91f, 0.96f), keywords = new List<string> { "light pink", "light_pink", "rose clair" } },
+        new ColorMapping { colorName = "dark_pink", color = new Color(0.91f, 0.33f, 0.5f), keywords = new List<string> { "dark pink", "dark_pink", "rose foncé" } },
+        
+        // Brown variations
+        new ColorMapping { colorName = "brown", color = new Color(0.6f, 0.3f, 0f), keywords = new List<string> { "brown", "marron" } },
+        new ColorMapping { colorName = "light_brown", color = new Color(0.82f, 0.71f, 0.55f), keywords = new List<string> { "light brown", "light_brown", "marron clair" } },
+        new ColorMapping { colorName = "dark_brown", color = new Color(0.4f, 0.2f, 0f), keywords = new List<string> { "dark brown", "dark_brown", "marron foncé" } },
+        
+        // Basic colors without variations
         new ColorMapping { colorName = "white", color = Color.white, keywords = new List<string> { "white", "blanc" } },
         new ColorMapping { colorName = "black", color = Color.black, keywords = new List<string> { "black", "noir" } },
-        new ColorMapping { colorName = "orange", color = new Color(1f, 0.5f, 0f), keywords = new List<string> { "orange" } },
-        new ColorMapping { colorName = "purple", color = new Color(0.5f, 0f, 1f), keywords = new List<string> { "purple", "violet" } },
-        new ColorMapping { colorName = "pink", color = new Color(1f, 0.75f, 0.8f), keywords = new List<string> { "pink", "rose" } },
         new ColorMapping { colorName = "gray", color = Color.gray, keywords = new List<string> { "gray", "grey", "gris" } },
-        new ColorMapping { colorName = "brown", color = new Color(0.6f, 0.3f, 0f), keywords = new List<string> { "brown", "marron" } },
     };
     
     [Header("Visual Feedback")]

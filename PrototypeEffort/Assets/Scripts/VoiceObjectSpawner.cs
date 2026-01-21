@@ -49,6 +49,10 @@ public class VoiceObjectSpawner : MonoBehaviour
     [Tooltip("Reference to RuntimeModelLoader for loading .glb files at runtime")]
     [SerializeField] private RuntimeModelLoader runtimeModelLoader;
     
+    [Header("Text-to-Speech")]
+    [Tooltip("Reference to TextToSpeechManager for audio feedback (optional)")]
+    [SerializeField] private TextToSpeechManager ttsManager;
+    
     // Object naming system
     private Dictionary<string, int> objectCounters = new Dictionary<string, int>();
     private Dictionary<GameObject, ObjectMetadata> objectMetadata = new Dictionary<GameObject, ObjectMetadata>();
@@ -67,16 +71,16 @@ public class VoiceObjectSpawner : MonoBehaviour
         if (dictationManager != null)
         {
             dictationManager.OnFinalTranscript.AddListener(ProcessVoiceCommand);
+            
+            // Subscribe to dictation started event to stop TTS
+            dictationManager.OnPartialTranscript.AddListener(OnDictationStarted);
         }
         
         // Load inventory from CSV
         LoadInventoryFromCSV();
         
-        // Set initial welcome message
-        if (llmResponseText != null)
-        {
-            llmResponseText.text = "I will be your personal design companion, please hold A in order to talk to me. Try saying something like: \"place a pink chair\", and I can help you!";
-        }
+        // Set initial welcome message (spoken and displayed)
+        UpdateLLMResponseText("Hey! I'm your design assistant. Hold the red A button and speak clearly - your headset picks up the audio, no need to hold the controller like a microphone. Just tell me what type of furniture to spawn and I'd be happy to help!");
     }
     
     /// <summary>
@@ -144,6 +148,20 @@ public class VoiceObjectSpawner : MonoBehaviour
         if (dictationManager != null)
         {
             dictationManager.OnFinalTranscript.RemoveListener(ProcessVoiceCommand);
+            dictationManager.OnPartialTranscript.RemoveListener(OnDictationStarted);
+        }
+    }
+    
+    /// <summary>
+    /// Called when user starts speaking - stop any ongoing TTS
+    /// </summary>
+    private void OnDictationStarted(string partialTranscript)
+    {
+        // Stop TTS as soon as user starts talking
+        if (ttsManager != null && ttsManager.IsSpeaking())
+        {
+            Debug.Log("[VoiceObjectSpawner] User started speaking - stopping TTS");
+            ttsManager.StopSpeaking();
         }
     }
     
@@ -180,8 +198,8 @@ public class VoiceObjectSpawner : MonoBehaviour
             // This way user doesn't have to hold ray in same position while waiting
             CaptureCurrentSpawnPoint();
             
-            // Show processing message
-            UpdateLLMResponseText("Give me a second while I process your input...");
+            // Show loading message (visual only, don't speak)
+            UpdateLLMResponseText("Loading...", speak: false);
             
             // Use LLM for complex spawn commands with customization
             ProcessVoiceCommandWithPython(command);
@@ -311,17 +329,51 @@ public class VoiceObjectSpawner : MonoBehaviour
     {
         switch (colorName.ToLower())
         {
+            // Red variations
             case "red": return Color.red;
+            case "light_red": return new Color(1f, 0.5f, 0.5f);
+            case "dark_red": return new Color(0.5f, 0f, 0f);
+            
+            // Blue variations
             case "blue": return Color.blue;
+            case "light_blue": return new Color(0.53f, 0.81f, 0.98f);
+            case "dark_blue": return new Color(0f, 0f, 0.55f);
+            
+            // Green variations
             case "green": return Color.green;
+            case "light_green": return new Color(0.56f, 0.93f, 0.56f);
+            case "dark_green": return new Color(0f, 0.39f, 0f);
+            
+            // Yellow variations
             case "yellow": return Color.yellow;
+            case "light_yellow": return new Color(1f, 1f, 0.88f);
+            case "dark_yellow": return new Color(0.8f, 0.8f, 0f);
+            
+            // Orange variations
+            case "orange": return new Color(1f, 0.5f, 0f);
+            case "light_orange": return new Color(1f, 0.8f, 0.6f);
+            case "dark_orange": return new Color(1f, 0.27f, 0f);
+            
+            // Purple variations
+            case "purple": return new Color(0.5f, 0f, 0.5f);
+            case "light_purple": return new Color(0.87f, 0.63f, 0.87f);
+            case "dark_purple": return new Color(0.29f, 0f, 0.51f);
+            
+            // Pink variations
+            case "pink": return new Color(1f, 0.75f, 0.8f);
+            case "light_pink": return new Color(1f, 0.91f, 0.96f);
+            case "dark_pink": return new Color(0.91f, 0.33f, 0.5f);
+            
+            // Brown variations
+            case "brown": return new Color(0.6f, 0.3f, 0f);
+            case "light_brown": return new Color(0.82f, 0.71f, 0.55f);
+            case "dark_brown": return new Color(0.4f, 0.2f, 0f);
+            
+            // Basic colors without variations
             case "white": return Color.white;
             case "black": return Color.black;
-            case "orange": return new Color(1f, 0.5f, 0f);
-            case "purple": return new Color(0.5f, 0f, 0.5f);
-            case "pink": return new Color(1f, 0.75f, 0.8f);
-            case "brown": return new Color(0.6f, 0.3f, 0f);
             case "gray": case "grey": return Color.gray;
+            
             default: 
                 Debug.LogWarning($"Unknown color: {colorName}");
                 return null;
@@ -668,6 +720,12 @@ public class VoiceObjectSpawner : MonoBehaviour
         Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
         foreach (Renderer renderer in renderers)
         {
+            // Skip the highlight bounding box - we don't want to change its color
+            if (renderer.gameObject.name == "HighlightBoundingBox")
+            {
+                continue;
+            }
+            
             foreach (Material mat in renderer.materials)
             {
                 mat.color = color;
@@ -733,18 +791,51 @@ public class VoiceObjectSpawner : MonoBehaviour
     /// </summary>
     private string ColorToName(Color color)
     {
-        // Check common colors with tolerance
-        if (ColorDistance(color, Color.red) < 0.3f) return "Red";
-        if (ColorDistance(color, Color.blue) < 0.3f) return "Blue";
-        if (ColorDistance(color, Color.green) < 0.3f) return "Green";
-        if (ColorDistance(color, Color.yellow) < 0.3f) return "Yellow";
-        if (ColorDistance(color, Color.white) < 0.3f) return "White";
-        if (ColorDistance(color, Color.black) < 0.3f) return "Black";
-        if (ColorDistance(color, new Color(0.65f, 0.16f, 0.16f)) < 0.3f) return "Brown";
-        if (ColorDistance(color, new Color(1f, 0.65f, 0f)) < 0.3f) return "Orange";
-        if (ColorDistance(color, new Color(0.5f, 0f, 0.5f)) < 0.3f) return "Purple";
-        if (ColorDistance(color, new Color(1f, 0.75f, 0.8f)) < 0.3f) return "Pink";
-        if (ColorDistance(color, Color.gray) < 0.3f) return "Gray";
+        // Check all color variations with tolerance
+        // Red variations
+        if (ColorDistance(color, Color.red) < 0.2f) return "Red";
+        if (ColorDistance(color, new Color(1f, 0.5f, 0.5f)) < 0.2f) return "Light_Red";
+        if (ColorDistance(color, new Color(0.5f, 0f, 0f)) < 0.2f) return "Dark_Red";
+        
+        // Blue variations
+        if (ColorDistance(color, Color.blue) < 0.2f) return "Blue";
+        if (ColorDistance(color, new Color(0.53f, 0.81f, 0.98f)) < 0.2f) return "Light_Blue";
+        if (ColorDistance(color, new Color(0f, 0f, 0.55f)) < 0.2f) return "Dark_Blue";
+        
+        // Green variations
+        if (ColorDistance(color, Color.green) < 0.2f) return "Green";
+        if (ColorDistance(color, new Color(0.56f, 0.93f, 0.56f)) < 0.2f) return "Light_Green";
+        if (ColorDistance(color, new Color(0f, 0.39f, 0f)) < 0.2f) return "Dark_Green";
+        
+        // Yellow variations
+        if (ColorDistance(color, Color.yellow) < 0.2f) return "Yellow";
+        if (ColorDistance(color, new Color(1f, 1f, 0.88f)) < 0.2f) return "Light_Yellow";
+        if (ColorDistance(color, new Color(0.8f, 0.8f, 0f)) < 0.2f) return "Dark_Yellow";
+        
+        // Orange variations
+        if (ColorDistance(color, new Color(1f, 0.5f, 0f)) < 0.2f) return "Orange";
+        if (ColorDistance(color, new Color(1f, 0.8f, 0.6f)) < 0.2f) return "Light_Orange";
+        if (ColorDistance(color, new Color(1f, 0.27f, 0f)) < 0.2f) return "Dark_Orange";
+        
+        // Purple variations
+        if (ColorDistance(color, new Color(0.5f, 0f, 0.5f)) < 0.2f) return "Purple";
+        if (ColorDistance(color, new Color(0.87f, 0.63f, 0.87f)) < 0.2f) return "Light_Purple";
+        if (ColorDistance(color, new Color(0.29f, 0f, 0.51f)) < 0.2f) return "Dark_Purple";
+        
+        // Pink variations
+        if (ColorDistance(color, new Color(1f, 0.75f, 0.8f)) < 0.2f) return "Pink";
+        if (ColorDistance(color, new Color(1f, 0.91f, 0.96f)) < 0.2f) return "Light_Pink";
+        if (ColorDistance(color, new Color(0.91f, 0.33f, 0.5f)) < 0.2f) return "Dark_Pink";
+        
+        // Brown variations
+        if (ColorDistance(color, new Color(0.6f, 0.3f, 0f)) < 0.2f) return "Brown";
+        if (ColorDistance(color, new Color(0.82f, 0.71f, 0.55f)) < 0.2f) return "Light_Brown";
+        if (ColorDistance(color, new Color(0.4f, 0.2f, 0f)) < 0.2f) return "Dark_Brown";
+        
+        // Basic colors without variations
+        if (ColorDistance(color, Color.white) < 0.2f) return "White";
+        if (ColorDistance(color, Color.black) < 0.2f) return "Black";
+        if (ColorDistance(color, Color.gray) < 0.2f) return "Gray";
         
         return "Colored"; // Fallback for unknown colors
     }
@@ -1010,7 +1101,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         
         // No object found and no description provided
         Debug.LogWarning("[VoiceObjectSpawner] No object is being held or pointed at!");
-        UpdateLLMResponseText("Please grab or point at an object, or describe it (e.g., 'delete the pink chair').");
+        UpdateLLMResponseText("Please grab or point at an object, then say delete or remove.");
     }
     
     /// <summary>
@@ -1255,11 +1346,17 @@ public class VoiceObjectSpawner : MonoBehaviour
         }
     }
     
-    private void UpdateLLMResponseText(string text)
+    private void UpdateLLMResponseText(string text, bool speak = true)
     {
         if (llmResponseText != null)
         {
             llmResponseText.text = $"AI: {text}";
+        }
+        
+        // Only speak if requested (skip for loading messages)
+        if (speak && ttsManager != null)
+        {
+            ttsManager.Speak(text);
         }
     }
     
@@ -1305,7 +1402,7 @@ public class VoiceObjectSpawner : MonoBehaviour
         }
     }
     
-    private void ReplaceObjectWithVariation()
+    private async void ReplaceObjectWithVariation()
     {
         XRRayInteractor activeRayInteractor = GetActiveRayInteractor();
         if (activeRayInteractor == null)
@@ -1331,12 +1428,22 @@ public class VoiceObjectSpawner : MonoBehaviour
             Vector3 position = hitObject.transform.position;
             Quaternion rotation = hitObject.transform.rotation;
             
-            // Try to find what type of object this is from its name
+            // Try to find what type of object this is from its name or metadata
             string objectType = ExtractObjectTypeFromName(hitObject.name);
+            
+            // If we have metadata, use that for more accurate object type
+            if (objectMetadata.ContainsKey(hitObject))
+            {
+                objectType = objectMetadata[hitObject].objectType;
+            }
             
             if (!string.IsNullOrEmpty(objectType))
             {
                 // Delete old object
+                if (objectMetadata.ContainsKey(hitObject))
+                {
+                    objectMetadata.Remove(hitObject);
+                }
                 Destroy(hitObject);
                 
                 // Spawn new variation at same location
@@ -1345,10 +1452,21 @@ public class VoiceObjectSpawner : MonoBehaviour
                 {
                     VoiceObjectMapping selected = matches[Random.Range(0, matches.Count)];
                     
-                    if (selected.prefab != null)
+                    // Support both GLB and prefabs
+                    if (!string.IsNullOrEmpty(selected.glbPath) && runtimeModelLoader != null)
+                    {
+                        Debug.Log($"Replacing with GLB variation: {selected.objectName} (modelId: {selected.modelId})");
+                        await SpawnGLBAtRaycastWithColor(selected.glbPath, selected.objectName, selected.modelId, null, null);
+                    }
+                    else if (selected.prefab != null)
                     {
                         GameObject newObject = Instantiate(selected.prefab, position, rotation);
-                        Debug.Log($"Replaced with variation: {selected.objectName}");
+                        newObject.tag = "SpawnedObject";
+                        Debug.Log($"Replaced with prefab variation: {selected.objectName}");
+                    }
+                    else
+                    {
+                        UpdateLLMResponseText($"No variations available for {objectType}.");
                     }
                 }
                 else
