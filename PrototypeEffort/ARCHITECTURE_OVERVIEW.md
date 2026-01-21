@@ -28,11 +28,19 @@ This system enables contextually-aware furniture spawning in VR using Claude AI 
 ### 3. **Claude AI (Anthropic API)**
 - **Model**: `claude-sonnet-4-0`
 - **Input**: Voice command + relevant inventory entries
-- **Output**: JSON with `action`, `objectName`, `modelId`, `color`
-- **Intelligence**: Chooses contextually appropriate models
-  - "chair for my desk" → Selects OfficeChair variant
-  - "chair to relax" → Selects Recliner variant
-  - "dining chair" → Selects DiningChair variant
+- **Output**: JSON with `action`, `objectName`, `modelId`, `color`, etc.
+- **Personality**: Friendly and conversational, keeps responses short and natural
+- **Intelligence**: 
+  - Chooses contextually appropriate models
+    - "chair for my desk" → Selects OfficeChair variant
+    - "chair to relax" → Selects Recliner variant
+  - Translates materials to colors automatically
+    - "make it wood" → Applies brown + explains substitution
+  - Offers subcategory options when helpful
+    - "spawn a chair" → "I have office chairs, dining chairs, and recliners - which would you like?"
+  - Provides helpful guidance
+    - "how do I place objects?" → Explains raycast and relative positioning
+  - **Note**: Color modification only - model variation swapping not available
 
 ### 4. **Unity VR Application**
 - **Platform Detection**: 
@@ -252,11 +260,14 @@ C:\Users\s2733099\ShapenetData\
 ```csharp
 public class LLMResponse
 {
-    public string action;       // "spawn", "delete", "modify"
+    public string action;       // "spawn", "delete", "modify", "scale", "query"
     public string objectName;   // "chair", "table", etc.
     public string modelId;      // "6625567b0c22800524dc97938ca5e893"
-    public string color;        // "red", "blue", null
+    public string color;        // "red", "light_blue", "dark_green", etc. (27 variations)
     public int quantity;        // 1, 2, 3...
+    public float scaleFactor;   // 0.8 (smaller), 1.2 (bigger), etc.
+    public string relativePosition; // "front", "behind", "left", "right"
+    public string response;     // Conversational responses from LLM
 }
 ```
 
@@ -270,6 +281,39 @@ public class VoiceObjectMapping
     public List<string> keywords;       // Search keywords
 }
 ```
+
+---
+
+## Color System
+
+### Available Colors (27 Total)
+
+**Color Variations** (light/dark for most colors):
+- Red: `red`, `light_red`, `dark_red`
+- Blue: `blue`, `light_blue`, `dark_blue`
+- Green: `green`, `light_green`, `dark_green`
+- Yellow: `yellow`, `light_yellow`, `dark_yellow`
+- Orange: `orange`, `light_orange`, `dark_orange`
+- Purple: `purple`, `light_purple`, `dark_purple`
+- Pink: `pink`, `light_pink`, `dark_pink`
+- Brown: `brown`, `light_brown`, `dark_brown`
+
+**Basic Colors** (no variations):
+- `white`, `black`, `gray`
+
+### Material Intelligence
+
+The LLM automatically translates material requests to colors:
+- "wood"/"wooden" → brown ("Making it brown like wood!")
+- "metal"/"steel"/"metallic" → gray ("Going with gray for that metallic look!")
+- "gold"/"golden" → yellow ("Golden yellow coming up!")
+- "silver" → gray
+- "bronze"/"copper" → orange or brown
+- "marble" → white
+
+### Highlight Box Protection
+
+When changing object colors, the translucent blue highlight bounding box is automatically excluded from color changes, maintaining consistent visual feedback.
 
 ---
 
